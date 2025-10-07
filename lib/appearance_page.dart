@@ -8,6 +8,8 @@ import 'package:flutter_settings_screens/flutter_settings_screens.dart';
 
 
 class AppearancePage extends StatefulWidget {
+  const AppearancePage({super.key});
+
   @override
   _AppearancePageState createState() => _AppearancePageState();
 }
@@ -26,13 +28,6 @@ class _AppearancePageState extends State<AppearancePage> {
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
-    if (token == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPageWidget()),
-      );
-    }
   }
   
   

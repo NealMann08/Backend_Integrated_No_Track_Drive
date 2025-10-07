@@ -14,7 +14,9 @@ class AccountPage extends StatefulWidget {
   // Key for storing language preference
   static const keyLanguage = 'key-language'; 
   // Key for storing password (unused in current implementation)
-  static const keyPassword = 'key-password'; 
+  static const keyPassword = 'key-password';
+
+  const AccountPage({super.key}); 
   @override
   _AccountPageState createState() => _AccountPageState();
 }
@@ -37,13 +39,6 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
-    if (token == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPageWidget()),
-      );
-    }
   }
 
   // Opens image picker to select an image from gallery or camera.
@@ -63,24 +58,20 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _saveProfileImage(String imagePath) async {
     final prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-    if (token != null) {
-      await prefs.setString('profile_image_$token', imagePath);
+    await prefs.setString('profile_image_$token', imagePath);
     }
-  }
 
   // Loads the profile image from SharedPreferences if it exists.
   Future<void> _loadProfileImage() async {
     final prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('auth_token');
-    if (token != null) {
-      final imagePath = prefs.getString('profile_image_$token');
-      if (imagePath != null) {
-        setState(() {
-          _profileImage = File(imagePath);
-        });
-      }
+    final imagePath = prefs.getString('profile_image_$token');
+    if (imagePath != null) {
+      setState(() {
+        _profileImage = File(imagePath);
+      });
     }
-  }
+    }
 
   // Shows a bottom sheet dialog for choosing image source (camera or gallery).
   void _showImagePickerDialog() {

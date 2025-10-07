@@ -8,6 +8,8 @@ import 'package:flutter_settings_screens/flutter_settings_screens.dart';
 
 
 class HelpSupportPage extends StatefulWidget {
+  const HelpSupportPage({super.key});
+
   @override
   _HelpSupportPageState createState() => _HelpSupportPageState();
 }
@@ -26,13 +28,6 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
-    if (token == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPageWidget()),
-      );
-    }
   }
   
   

@@ -17,8 +17,8 @@ class UserTripsPage extends StatefulWidget {
     this.isLoading = false,
     this.errorMessage = '',
     this.onSearchSubmitted,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   _UserTripsPageState createState() => _UserTripsPageState();

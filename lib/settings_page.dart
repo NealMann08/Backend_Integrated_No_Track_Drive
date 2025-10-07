@@ -13,6 +13,8 @@ import 'account_page.dart';
 import 'notifications_page.dart';
 
 class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
 
   @override
   _SettingsPage createState() => _SettingsPage();

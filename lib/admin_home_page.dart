@@ -900,6 +900,32 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 SizedBox(height: 12),
 
                 // Role-specific fields
+                // if (_selectedRole == 'user') ...[
+                //   _buildFormField(
+                //     controller: _firstNameController,
+                //     label: 'First Name',
+                //     icon: Icons.person,
+                //     validator: (value) {
+                //       if (value == null || value.isEmpty) {
+                //         return 'Please enter first name';
+                //       }
+                //       return null;
+                //     },
+                //   ),
+                //   SizedBox(height: 12),
+                //   _buildFormField(
+                //     controller: _lastNameController,
+                //     label: 'Last Name',
+                //     icon: Icons.person_outline,
+                //     validator: (value) {
+                //       if (value == null || value.isEmpty) {
+                //         return 'Please enter last name';
+                //       }
+                //       return null;
+                //     },
+                //   ),
+                // ],
+                //revert to above code if below fails
                 if (_selectedRole == 'user') ...[
                   _buildFormField(
                     controller: _firstNameController,
@@ -920,6 +946,21 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter last name';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildFormField(
+                    controller: _adminIdController,  // Reuse this controller for zipcode
+                    label: 'Zipcode',
+                    icon: Icons.location_on,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter zipcode';
+                      }
+                      if (value.length != 5 || !RegExp(r'^\d+$').hasMatch(value)) {
+                        return 'Please enter a valid 5-digit zipcode';
                       }
                       return null;
                     },
@@ -1147,9 +1188,90 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   // Shows detailed user information dialog
+  // void _showUserDetailsDialog(Map<String, dynamic> user) {
+  //   final isWeb = kIsWeb;
+  //   final maxDialogWidth = isWeb ? 500.0 : double.infinity;
+
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => Dialog(
+  //       shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(16),
+  //       ),
+  //       insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+  //       child: ConstrainedBox(
+  //         constraints: BoxConstraints(maxWidth: maxDialogWidth),
+  //         child: Padding(
+  //           padding: const EdgeInsets.all(24.0),
+  //           child: Column(
+  //             mainAxisSize: MainAxisSize.min,
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               // User header with avatar
+  //               Row(
+  //                 children: [
+  //                   CircleAvatar(
+  //                     radius: 28,
+  //                     backgroundColor: Colors.blue[100],
+  //                     child: Icon(
+  //                       Icons.person,
+  //                       color: Colors.blue[700],
+  //                       size: 30,
+  //                     ),
+  //                   ),
+  //                   SizedBox(width: 16),
+  //                   Expanded(
+  //                     child: Text(
+  //                       '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}',
+  //                       style: TextStyle(
+  //                         fontSize: 20,
+  //                         fontWeight: FontWeight.bold,
+  //                         color: Colors.blue[900],
+  //                       ),
+  //                     ),
+  //                   ),
+  //                   IconButton(
+  //                     icon: Icon(Icons.close),
+  //                     onPressed: () => Navigator.pop(context),
+  //                   ),
+  //                 ],
+  //               ),
+  //               SizedBox(height: 16),
+  //               Divider(),
+  //               SizedBox(height: 8),
+  //               // User details rows
+  //               _buildUserDetailRow('Email', user['email']),
+  //               _buildUserDetailRow('Role', user['role']),
+  //               _buildUserDetailRow('User ID', user['user_id']),
+  //               if (user.containsKey('policy_number'))
+  //                 _buildUserDetailRow('Policy Number', user['policy_number']),
+  //               SizedBox(height: 20),
+  //               // Close button
+  //               Align(
+  //                 alignment: Alignment.centerRight,
+  //                 child: TextButton.icon(
+  //                   onPressed: () => Navigator.pop(context),
+  //                   icon: Icon(Icons.check),
+  //                   label: Text('Close'),
+  //                   style: TextButton.styleFrom(
+  //                     foregroundColor: Colors.blue[800],
+  //                   ),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+  // revert to above code if below fails
   void _showUserDetailsDialog(Map<String, dynamic> user) {
     final isWeb = kIsWeb;
-    final maxDialogWidth = isWeb ? 500.0 : double.infinity;
+    final maxDialogWidth = isWeb ? 800.0 : double.infinity;
+
+    // Check if this is a driver with analytics data
+    bool hasAnalytics = user.containsKey('behavior_score');
 
     showDialog(
       context: context,
@@ -1159,65 +1281,149 @@ class _AdminHomePageState extends State<AdminHomePage> {
         ),
         insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 40),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxDialogWidth),
+          constraints: BoxConstraints(maxWidth: maxDialogWidth, maxHeight: 600),
           child: Padding(
             padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // User header with avatar
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 28,
-                      backgroundColor: Colors.blue[100],
-                      child: Icon(
-                        Icons.person,
-                        color: Colors.blue[700],
-                        size: 30,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // User header with avatar
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: Colors.blue[100],
+                        child: Icon(
+                          Icons.person,
+                          color: Colors.blue[700],
+                          size: 30,
+                        ),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                            if (hasAnalytics)
+                              Container(
+                                margin: EdgeInsets.only(top: 4),
+                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: user['behavior_score'] >= 80 ? Colors.green[100] : 
+                                        user['behavior_score'] >= 60 ? Colors.orange[100] : Colors.red[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Score: ${user['behavior_score']?.toInt() ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: user['behavior_score'] >= 80 ? Colors.green[800] : 
+                                          user['behavior_score'] >= 60 ? Colors.orange[800] : Colors.red[800],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  Divider(),
+                  SizedBox(height: 8),
+                  
+                  // Basic user details
+                  _buildUserDetailRow('Email', user['email']),
+                  _buildUserDetailRow('Role', user['role']),
+                  _buildUserDetailRow('User ID', user['user_id']),
+                  
+                  // Driver-specific analytics if available
+                  if (hasAnalytics) ...[
+                    SizedBox(height: 16),
+                    Text(
+                      'Driver Analytics',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[900],
                       ),
                     ),
-                    SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}',
+                    SizedBox(height: 8),
+                    _buildUserDetailRow('Behavior Score', '${user['behavior_score']?.toInt() ?? 0}/100'),
+                    _buildUserDetailRow('Total Trips', user['total_trips']?.toString() ?? '0'),
+                    _buildUserDetailRow('Total Distance', '${user['total_distance']?.toStringAsFixed(1) ?? '0'} miles'),
+                    _buildUserDetailRow('Risk Level', user['risk_level'] ?? 'Unknown'),
+                    
+                    if (user['trips'] != null && user['trips'].isNotEmpty) ...[
+                      SizedBox(height: 16),
+                      Text(
+                        'Recent Trips',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.blue[900],
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
+                      SizedBox(height: 8),
+                      Container(
+                        height: 200,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: ListView.builder(
+                          itemCount: (user['trips'] as List).take(5).length,
+                          itemBuilder: (context, index) {
+                            var trip = user['trips'][index];
+                            return ListTile(
+                              dense: true,
+                              title: Text('Trip ${index + 1}', style: TextStyle(fontSize: 13)),
+                              subtitle: Text(
+                                'Distance: ${trip['total_distance_miles']?.toStringAsFixed(1) ?? '0'} mi | Score: ${trip['behavior_score']?.toInt() ?? 0}',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                              trailing: Text(
+                                trip['start_timestamp'] != null 
+                                  ? trip['start_timestamp'].toString().substring(0, 10)
+                                  : '',
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ],
-                ),
-                SizedBox(height: 16),
-                Divider(),
-                SizedBox(height: 8),
-                // User details rows
-                _buildUserDetailRow('Email', user['email']),
-                _buildUserDetailRow('Role', user['role']),
-                _buildUserDetailRow('User ID', user['user_id']),
-                if (user.containsKey('policy_number'))
-                  _buildUserDetailRow('Policy Number', user['policy_number']),
-                SizedBox(height: 20),
-                // Close button
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.check),
-                    label: Text('Close'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.blue[800],
+                  
+                  SizedBox(height: 20),
+                  // Close button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.check),
+                      label: Text('Close'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue[800],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -1842,6 +2048,35 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   // Searches for users based on query
+  // void _searchUsers([
+  //   void Function(VoidCallback fn)? modalSetState,
+  //   BuildContext? context,
+  // ]) async {
+  //   if (context != null) FocusScope.of(context).unfocus();
+  //   final setStateFn = modalSetState ?? setState;
+
+  //   setStateFn(() {
+  //     _isLoadingUsers = true;
+  //     _userSearchError = '';
+  //     _userResults = [];
+  //   });
+
+  //   try {
+  //     final results = await TripService.searchUsers(_userSearchQuery);
+  //     setStateFn(() {
+  //       _userResults = results;
+  //     });
+  //   } catch (e) {
+  //     setStateFn(() {
+  //       _userSearchError = e.toString();
+  //     });
+  //   } finally {
+  //     setStateFn(() {
+  //       _isLoadingUsers = false;
+  //     });
+  //   }
+  // }
+  //revert to above code if below fails:
   void _searchUsers([
     void Function(VoidCallback fn)? modalSetState,
     BuildContext? context,
@@ -1856,14 +2091,50 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      final results = await TripService.searchUsers(_userSearchQuery);
-      setStateFn(() {
-        _userResults = results;
-      });
+      // Try to search using your analyze-driver endpoint
+      final response = await http.get(
+        Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=${Uri.encodeComponent(_userSearchQuery.trim())}'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // Store full analytics for display
+        // Create user result for list display
+        setStateFn(() {
+          _userResults = [{
+            'email': data['user_email'] ?? _userSearchQuery,
+            'first_name': data['user_name']?.split(' ').first ?? 'Driver',
+            'last_name': data['user_name']?.split(' ').skip(1).join(' ') ?? '',
+            'user_id': data['user_id'],
+            'role': 'driver',
+            'behavior_score': data['overall_behavior_score'],
+            'total_trips': data['total_trips'],
+            'total_distance': data['total_distance_miles'],
+            'risk_level': data['risk_level'],
+            'trips': data['trips'] ?? []
+          }];
+        });
+      } else if (response.statusCode == 404) {
+        setStateFn(() {
+          _userSearchError = 'User not found';
+        });
+      } else {
+        throw Exception('Failed to search users');
+      }
     } catch (e) {
-      setStateFn(() {
-        _userSearchError = e.toString();
-      });
+      // Fallback to Ryan's search if your backend fails
+      try {
+        final results = await TripService.searchUsers(_userSearchQuery);
+        setStateFn(() {
+          _userResults = results;
+        });
+      } catch (fallbackError) {
+        setStateFn(() {
+          _userSearchError = 'Search failed: ${e.toString()}';
+        });
+      }
     } finally {
       setStateFn(() {
         _isLoadingUsers = false;
@@ -1903,6 +2174,71 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   // Creates a new account with form data
+  // Future<void> _createAccount() async {
+  //   if (!_createAccountFormKey.currentState!.validate()) {
+  //     return;
+  //   }
+
+  //   setState(() {
+  //     _isCreatingAccount = true;
+  //     _createAccountError = '';
+  //   });
+
+  //   try {
+  //     SharedPreferences prefs = await SharedPreferences.getInstance();
+  //     String? token = prefs.getString('access_token');
+
+  //     if (token == null) {
+  //       throw Exception('No authentication token found');
+  //     }
+
+  //     Map<String, dynamic> requestBody = {
+  //       'email': _emailController.text,
+  //       'password': _passwordController.text,
+  //       'role': _selectedRole,
+  //     };
+
+  //     // Add role-specific fields
+  //     if (_selectedRole == 'user') {
+  //       requestBody['first_name'] = _firstNameController.text;
+  //       requestBody['last_name'] = _lastNameController.text;
+  //     } else if (_selectedRole == 'insurance') {
+  //       requestBody['company_name'] = _firstNameController.text;
+  //       requestBody['state'] = _lastNameController.text;
+  //     }
+
+  //     final response = await http.post(
+  //       Uri.parse('${AppConfig.server}/create-account'),
+  //       headers: {
+  //         'Authorization': 'Bearer $token',
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode(requestBody),
+  //     );
+
+  //     if (response.statusCode == 201) {
+  //       Navigator.pop(context);
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('Account created successfully'),
+  //           backgroundColor: Colors.green,
+  //         ),
+  //       );
+  //       _clearCreateAccountForm();
+  //     } else {
+  //       throw Exception('Failed to create account: ${response.statusCode}');
+  //     }
+  //   } catch (e) {
+  //     setState(() {
+  //       _createAccountError = 'Failed to create account: $e';
+  //     });
+  //   } finally {
+  //     setState(() {
+  //       _isCreatingAccount = false;
+  //     });
+  //   }
+  // }
+  //revert to above code if below fails:
   Future<void> _createAccount() async {
     if (!_createAccountFormKey.currentState!.validate()) {
       return;
@@ -1914,38 +2250,50 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('access_token');
-
-      if (token == null) {
-        throw Exception('No authentication token found');
-      }
-
+      // Prepare the request body for your backend
       Map<String, dynamic> requestBody = {
-        'email': _emailController.text,
+        'mode': 'signup',
+        'email': _emailController.text.toLowerCase().trim(),
         'password': _passwordController.text,
-        'role': _selectedRole,
       };
 
-      // Add role-specific fields
+      // Add role-specific fields based on _selectedRole
       if (_selectedRole == 'user') {
-        requestBody['first_name'] = _firstNameController.text;
-        requestBody['last_name'] = _lastNameController.text;
+        // Creating a driver account
+        requestBody['role'] = 'driver';
+        requestBody['name'] = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+        requestBody['zipcode'] = _adminIdController.text.trim(); // Using adminIdController for zipcode
       } else if (_selectedRole == 'insurance') {
-        requestBody['company_name'] = _firstNameController.text;
-        requestBody['state'] = _lastNameController.text;
+        // Creating an insurance provider account
+        requestBody['role'] = 'provider';
+        requestBody['name'] = _firstNameController.text.trim(); // Company name
+        requestBody['metadata'] = jsonEncode({
+          'original_role': 'insurance',
+          'state': _lastNameController.text.trim(),
+          'company_name': _firstNameController.text.trim()
+        });
+      } else if (_selectedRole == 'admin') {
+        // Creating another admin account
+        requestBody['role'] = 'provider';
+        requestBody['name'] = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
+        requestBody['metadata'] = jsonEncode({
+          'original_role': 'admin',
+          'admin_id': _adminIdController.text.trim(),
+          'server_number': _serverNumberController.text.trim()
+        });
       }
 
+      // Call your auth-user Lambda endpoint
       final response = await http.post(
-        Uri.parse('${AppConfig.server}/create-account'),
+        Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/auth-user'),
         headers: {
-          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
         body: jsonEncode(requestBody),
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200) {
+        // Success
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1954,13 +2302,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
           ),
         );
         _clearCreateAccountForm();
+        
+        // Refresh stats if needed
+        _fetchQuickStats();
       } else {
-        throw Exception('Failed to create account: ${response.statusCode}');
+        final errorBody = jsonDecode(response.body);
+        throw Exception(errorBody['error'] ?? 'Failed to create account');
       }
     } catch (e) {
       setState(() {
-        _createAccountError = 'Failed to create account: $e';
+        _createAccountError = e.toString().replaceAll('Exception: ', '');
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       setState(() {
         _isCreatingAccount = false;

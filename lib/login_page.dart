@@ -47,6 +47,9 @@ final _serverNumberController = TextEditingController();
   late TabController _tabController;
   final String server = AppConfig.server;
 
+  // remove if not working asap
+  final String authEndpoint = 'https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/auth-user';
+
   @override
   void initState() {
     super.initState();
@@ -95,39 +98,142 @@ final _serverNumberController = TextEditingController();
     }
   }
 
+  // Future<void> _signup() async {
+  //   final url = '$server/signup';
+  //   final data = _buildAuthData();
+
+  //   final response = await http.post(
+  //     Uri.parse(url),
+  //     headers: {'Content-Type': 'application/json'},
+  //     body: json.encode(data),
+  //   );
+
+  //   if (response.statusCode == 201) {
+  //     await _handleSuccessfulAuth(response.body);
+  //   } else {
+  //     final responseData = await _parseJson(response.body);
+  //     _showErrorDialog(responseData['message'] ?? 'Signup failed');
+  //   }
+  // }
+
+  // uncomment above code if below ufnction version does not work
+
   Future<void> _signup() async {
-    final url = '$server/signup';
-    final data = _buildAuthData();
+    final url = authEndpoint; // Use your Lambda endpoint
+    
+    // Map Flutter roles to your backend roles
+    String backendRole = 'driver'; // Default
+    if (_selectedRole == 'insurance' || _selectedRole == 'admin') {
+      backendRole = 'provider';
+    }
+    
+    // Build data structure matching your backend
+    final data = {
+      'email': emailController.text.toLowerCase().trim(),
+      'password': passwordController.text,
+      'mode': 'signup',
+      'role': backendRole,
+    };
+    
+    // Add name field (combine first and last name)
+    // if (_selectedRole == 'user') {
+    //   data['name'] = '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+    // }
+    if (_selectedRole == 'user') {
+      data['name'] = '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+      data['zipcode'] = '00000'; // Default zipcode - you may want to add a field for this
+    } else if (_selectedRole == 'insurance') {
+      data['name'] = insuranceProviderController.text.trim();
+      // Store additional fields in metadata if needed
+      // data['metadata'] = {
+      //   'state': stateController.text.trim(),
+      //   'original_role': 'insurance'
+      // } as String;
+      //revert to above if below failing
+      data['metadata'] = jsonEncode({
+        'state': stateController.text.trim(),
+        'original_role': 'insurance'
+      });
+    } else if (_selectedRole == 'admin') {
+      data['name'] = '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
+      // data['metadata'] = {
+      //   'admin_id': idController.text.trim(),
+      //   'server_number': serverNumberController.text.trim(),
+      //   'original_role': 'admin'
+      // } as String;
+      //revert to above if below failing
+      data['metadata'] = jsonEncode({
+        'admin_id': idController.text.trim(),
+        'server_number': serverNumberController.text.trim(),
+        'original_role': 'admin'
+      });
+    }
+
+    print('Sending signup request: $data');
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode(data),
+      body: jsonEncode(data),
     );
 
-    if (response.statusCode == 201) {
+    if (response.statusCode == 200) {
       await _handleSuccessfulAuth(response.body);
     } else {
       final responseData = await _parseJson(response.body);
-      _showErrorDialog(responseData['message'] ?? 'Signup failed');
+      _showErrorDialog(responseData['error'] ?? 'Signup failed');
     }
   }
 
+  // Future<void> _login() async {
+  //   //original code
+  //   final url = '$server/login';
+
+  //   //new code for my backend
+  //   // final url = '$server/auth-user';
+  //   // final url = 'https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/auth-user';
+  //   final data = _buildAuthData();
+  //   print(data);
+
+  //   final response = await http.post(
+  //     Uri.parse(url),
+  //     headers: {'Content-Type': 'application/json'},
+  //     body: jsonEncode(data), 
+  //   );
+
+  //   if (response.statusCode == 202) {
+  //     await _handleSuccessfulAuth(response.body);
+  //   } else {
+  //     final responseData = await _parseJson(response.body);
+  //     _showErrorDialog(responseData['message'] ?? 'Login failed');
+  //   }
+  // }
+
+
+  //uncomment above code if below ufnction version does not wor
   Future<void> _login() async {
-    final url = '$server/login';
-    final data = _buildAuthData();
+    final url = authEndpoint; // Use your Lambda endpoint
+    
+    // Build data structure matching your backend
+    final data = {
+      'email': emailController.text.toLowerCase().trim(),
+      'password': passwordController.text,
+      'mode': 'signin',
+    };
+
+    print('Sending login request: $data');
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode(data),
+      body: jsonEncode(data),
     );
 
-    if (response.statusCode == 202) {
+    if (response.statusCode == 200) {
       await _handleSuccessfulAuth(response.body);
     } else {
       final responseData = await _parseJson(response.body);
-      _showErrorDialog(responseData['message'] ?? 'Login failed');
+      _showErrorDialog(responseData['error'] ?? 'Login failed');
     }
   }
 
@@ -136,6 +242,7 @@ final _serverNumberController = TextEditingController();
       'email': emailController.text,
       'password': passwordController.text,
       'role': _selectedRole,
+      'mode': _isSignupMode ? 'signup' : 'signin',
     };
 
     if (_selectedRole == 'user') {
@@ -174,14 +281,172 @@ final _serverNumberController = TextEditingController();
     return data;
   }
 
+  // Future<void> _handleSuccessfulAuth(String responseBody) async {
+  //   final responseData = json.decode(responseBody);
+  //   print('responseData: $responseData');
+  //   final token = responseData['access_token'];
+  //   await _prefs.setString('access_token', token);
+  //   final decodedToken = JwtDecoder.decode(token);
+  //   final role = decodedToken['role'];
+  //   print('role: $role');
+
+  //   if (mounted) {
+  //     Navigator.pushReplacement(
+  //       context,
+  //       MaterialPageRoute(builder: (context) => HomePage(role: role)),
+  //     );
+  //   }
+  //   print(' 222222');
+  // }
+
+  // uncomment above code if below ufnction version does not work
+
   Future<void> _handleSuccessfulAuth(String responseBody) async {
     final responseData = json.decode(responseBody);
-    final token = responseData['access_token'];
+    print('Auth response received: ${responseData['message']}');
+    
+    // Extract user data from your backend response
+    final userData = responseData['user_data'];
+
+
+    // delete below code if failing
+
+    // Parse the name for first_name and last_name
+    String fullName = userData['name'] ?? '';
+    List<String> nameParts = fullName.split(' ');
+    String firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+    String lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+    
+    // Create a pseudo-JWT token containing user data
+    // (Since your backend doesn't return JWT, we'll create a simple token)
+    final tokenData = {
+      'user_id': userData['user_id'],
+      'email': userData['email'],
+      'name': userData['name'],
+      //delete below data sections if failing
+      'first_name': firstName,
+      'last_name': lastName,
+      'role': _selectedRole, // Keep original Flutter role for compatibility
+      'backend_role': userData['role'], // Store your backend role too
+      'exp': DateTime.now().add(Duration(days: 30)).millisecondsSinceEpoch ~/ 1000,
+
+    };
+    
+    // Encode as simple base64 (not a real JWT, but maintains app structure)
+    final token = base64Encode(utf8.encode(json.encode(tokenData)));
+    
     await _prefs.setString('access_token', token);
+    await _prefs.setString('user_data', json.encode(userData));
 
-    final decodedToken = JwtDecoder.decode(token);
-    final role = decodedToken['role'];
+    // Phase 4: Store zipcode if available
+    if (userData['zipcode'] != null) {
+      await _prefs.setString('user_zipcode', userData['zipcode'].toString());
+    }
 
+    
+    // // Decode for navigation (maintaining existing app flow)
+    // final role = _selectedRole; // Use Flutter's role system for navigation
+    //revert to above if below causes issues
+    // Determine the correct role for navigation
+      // String navigationRole = _selectedRole;
+
+      // // Check if this is actually an admin or insurance account from metadata
+      // if (userData['role'] == 'provider' && userData['metadata'] != null) {
+      //   try {
+      //     Map<String, dynamic> metadata;
+      //     if (userData['metadata'] is String) {
+      //       // If metadata is a JSON string, parse it
+      //       metadata = json.decode(userData['metadata']);
+      //     } else if (userData['metadata'] is Map) {
+      //       // If metadata is already a Map
+      //       metadata = userData['metadata'] as Map<String, dynamic>;
+      //     } else {
+      //       metadata = {};
+      //     }
+          
+      //     print('Metadata parsed: $metadata');
+          
+      //     if (metadata['original_role'] == 'admin') {
+      //       navigationRole = 'admin';
+      //     } else if (metadata['original_role'] == 'insurance') {
+      //       navigationRole = 'insurance';
+      //     }
+      //   } catch (e) {
+      //     print('Error parsing metadata: $e');
+      //     // Default to insurance for providers
+      //     navigationRole = 'insurance';
+      //   }
+      // } else if (userData['role'] == 'driver') {
+      //   navigationRole = 'user';
+      // }
+
+      // print('Final navigation role: $navigationRole');
+      // final role = navigationRole;
+      // revert to above if below causes issues
+      // Determine the correct role for navigation
+      String navigationRole = 'user'; // Default
+
+      // For LOGIN, we need to detect role from backend response
+      if (!_isSignupMode) {
+        // During login, detect role from backend data
+        if (userData['role'] == 'provider') {
+          // Check metadata to determine if insurance or admin
+          if (userData['metadata'] != null) {
+            try {
+              Map<String, dynamic> metadata;
+              if (userData['metadata'] is String) {
+                metadata = json.decode(userData['metadata']);
+              } else if (userData['metadata'] is Map) {
+                metadata = userData['metadata'] as Map<String, dynamic>;
+              } else {
+                metadata = {};
+              }
+              
+              if (metadata['original_role'] == 'admin') {
+                navigationRole = 'admin';
+              } else if (metadata['original_role'] == 'insurance') {
+                navigationRole = 'insurance';
+              } else {
+                navigationRole = 'insurance'; // Default provider to insurance
+              }
+            } catch (e) {
+              print('Error parsing metadata during login: $e');
+              navigationRole = 'insurance';
+            }
+          } else {
+            navigationRole = 'insurance'; // Provider without metadata = insurance
+          }
+        } else if (userData['role'] == 'driver') {
+          navigationRole = 'user';
+        }
+      } else {
+        // For SIGNUP, use the selected role with metadata check
+        navigationRole = _selectedRole;
+        if (userData['role'] == 'provider' && userData['metadata'] != null) {
+          try {
+            Map<String, dynamic> metadata;
+            if (userData['metadata'] is String) {
+              metadata = json.decode(userData['metadata']);
+            } else if (userData['metadata'] is Map) {
+              metadata = userData['metadata'] as Map<String, dynamic>;
+            } else {
+              metadata = {};
+            }
+            
+            if (metadata['original_role'] == 'admin') {
+              navigationRole = 'admin';
+            } else if (metadata['original_role'] == 'insurance') {
+              navigationRole = 'insurance';
+            }
+          } catch (e) {
+            print('Error parsing metadata during signup: $e');
+          }
+        }
+      }
+
+      print('Login mode: ${!_isSignupMode}, Backend role: ${userData['role']}, Final navigation role: $navigationRole');
+      final role = navigationRole;
+    
     if (mounted) {
       Navigator.pushReplacement(
         context,

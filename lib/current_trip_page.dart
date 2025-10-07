@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
 
 class CurrentTripPage extends StatefulWidget {
+  const CurrentTripPage({super.key});
+
   @override
   CurrentTripPageState createState() => CurrentTripPageState();
 }
@@ -28,11 +30,15 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   int _pointCounter = 0;
   int? _firstMaskedLatitude, _firstMaskedLongitude;
   final String server = AppConfig.server;
-  int _selectedIndex = 0;
-
   Random rand = Random();
-
   late String role;
+  //remove these calls if changes do not work
+  final String trajectoryEndpoint = 'https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/store-trajectory-batch';
+  final String finalizeEndpoint = 'https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/finalize-trip';
+  int _selectedIndex = 0;
+  double currentSpeed = 0.0;
+  double maxSpeed = 0.0;
+  Position? lastPosition;
 
   Future<void> _loadFirstPoint() async {
     final prefs = await SharedPreferences.getInstance();
@@ -247,22 +253,86 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   }
 
   // Stop the trip but KEEP delta points visible
+  // void stopTrip() async {
+  //   setState(() {
+  //     isTripStarted = false; // Stops the trip but keeps everything visible
+  //   });
+
+  //   // Send remaining data but DO NOT clear `deltaPoints` or reset UI
+  //   if (_elapsedTime > 5) {
+  //     sendTripData();
+  //   }
+
+  //   // Stop all timers
+  //   _deltaTimer?.cancel();
+  //   _elapsedTimeTimer?.cancel();
+  //   _sendDataTimer?.cancel();
+
+  //   // Forces UI refresh without clearing data
+  //   setState(() {});
+  // }
+  // revert to above function if below modified stoptrip() causes issues
   void stopTrip() async {
     setState(() {
-      isTripStarted = false; // Stops the trip but keeps everything visible
+      isTripStarted = false;
     });
 
-    // Send remaining data but DO NOT clear `deltaPoints` or reset UI
-    if (_elapsedTime > 5) {
-      sendTripData();
+    // Send remaining data
+    if (deltaPoints.isNotEmpty) {
+      await sendTripData();
     }
 
-    // Stop all timers
+    // Finalize trip with your backend
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? tripId = prefs.getString('current_trip_id');
+    String? tripStartTime = prefs.getString('trip_start_time');
+    String? userDataJson = prefs.getString('user_data');
+    
+    if (tripId != null && tripId.isNotEmpty && userDataJson != null) {
+      Map<String, dynamic> userData = json.decode(userDataJson);
+      String userId = userData['user_id'] ?? '';
+      
+      Map<String, dynamic> finalizeData = {
+        'user_id': userId,
+        'trip_id': tripId,
+        'start_timestamp': tripStartTime,
+        'end_timestamp': DateTime.now().toIso8601String(),
+        'trip_quality': {
+          'total_points': _pointCounter,
+          'valid_points': _pointCounter,
+          'rejected_points': 0,
+          'average_accuracy': 5.0,
+          'actual_duration_minutes': _elapsedTime / 60,
+          'actual_distance_miles': 0, // Calculate if needed
+        }
+      };
+      
+      try {
+        final response = await http.post(
+          Uri.parse(finalizeEndpoint),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${prefs.getString('access_token')}',
+          },
+          body: json.encode(finalizeData),
+        );
+        
+        if (response.statusCode == 200) {
+          print('Trip finalized successfully');
+          // Clear trip data
+          await prefs.remove('current_trip_id');
+          await prefs.remove('trip_start_time');
+        }
+      } catch (error) {
+        print('Error finalizing trip: $error');
+      }
+    }
+
+    // Stop timers
     _deltaTimer?.cancel();
     _elapsedTimeTimer?.cancel();
     _sendDataTimer?.cancel();
-
-    // Forces UI refresh without clearing data
+    
     setState(() {});
   }
 
@@ -271,6 +341,29 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      // Calculate speed
+      if (lastPosition != null) {
+        double distance = Geolocator.distanceBetween(
+          lastPosition!.latitude,
+          lastPosition!.longitude,
+          position.latitude,
+          position.longitude,
+        );
+        double timeInSeconds = 5.0; // Since we poll every 5 seconds
+        double speedMps = distance / timeInSeconds;
+        double speedMph = speedMps * 2.237; // Convert m/s to mph
+        
+        setState(() {
+          currentSpeed = speedMph;
+          if (speedMph > maxSpeed) {
+            maxSpeed = speedMph;
+          }
+        });
+      }
+      
+      lastPosition = position;
+
 
       int maskedLatitude = (position.latitude * 1000000).toInt();
       int maskedLongitude = (position.longitude * 1000000).toInt();
@@ -313,22 +406,88 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     }
   }
 
+  // Future<void> sendTripData() async {
+  //   final String url = '$server/points';
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   String? token = prefs.getString('access_token');
+
+  //   Map<String, dynamic> data = {
+  //     'isStart': _elapsedTime <= 30,
+  //     'start_time': DateTime.now().toIso8601String(),
+  //     'elapsed_time': _elapsedTime,
+  //     'delta_points': deltaPoints,
+  //     'isEnd': !isTripStarted,
+  //   };
+
+  //   try {
+  //     final response = await http.post(
+  //       Uri.parse(url),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': 'Bearer $token',
+  //       },
+  //       body: json.encode(data),
+  //     );
+
+  //     if (response.statusCode == 202) {
+  //       deltaPoints.clear();
+  //     } else {
+  //       debugPrint('Error sending trip data');
+  //     }
+  //   } catch (error) {
+  //     debugPrint('Error: $error');
+  //   }
+  // }
+  // IF below function causes issues revert to above sendTripData function
   Future<void> sendTripData() async {
-    final String url = '$server/points';
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
+    String? userDataJson = prefs.getString('user_data');
+    
+    if (userDataJson == null) return;
+    Map<String, dynamic> userData = json.decode(userDataJson);
+    String userId = userData['user_id'] ?? '';
+    
+    // Generate trip ID if not exists
+    String tripId = prefs.getString('current_trip_id') ?? '';
+    if (tripId.isEmpty) {
+      tripId = 'trip_${userId}_${DateTime.now().millisecondsSinceEpoch}_${rand.nextInt(999999)}';
+      await prefs.setString('current_trip_id', tripId);
+      await prefs.setString('trip_start_time', DateTime.now().toIso8601String());
+    }
+    
+    // Prepare batch data matching your backend format
     Map<String, dynamic> data = {
-      'isStart': _elapsedTime <= 30,
-      'start_time': DateTime.now().toIso8601String(),
-      'elapsed_time': _elapsedTime,
-      'delta_points': deltaPoints,
-      'isEnd': !isTripStarted,
+      'user_id': userId,
+      'trip_id': tripId,
+      'batch_number': _pointCounter ~/ 25,
+      'batch_size': deltaPoints.length,
+      'first_point_timestamp': deltaPoints.isNotEmpty ? deltaPoints.last['t'] : DateTime.now().toIso8601String(),
+      'last_point_timestamp': deltaPoints.isNotEmpty ? deltaPoints.first['t'] : DateTime.now().toIso8601String(),
+      'deltas': deltaPoints.map((point) => {
+        'delta_lat': point['dlat'],
+        'delta_long': point['dlon'],
+        'delta_time': 5000, // 5 seconds between points
+        'timestamp': point['t'],
+        'sequence': point['p'],
+        'speed_mph': 0, // You'll need to calculate this
+        'speed_confidence': 0.8,
+        'gps_accuracy': 5,
+        'is_stationary': false,
+        'data_quality': 'high'
+      }).toList(),
+      'quality_metrics': {
+        'valid_points': deltaPoints.length,
+        'rejected_points': 0,
+        'average_accuracy': 5.0,
+        'speed_data_quality': 0.8,
+        'gps_quality_score': 0.9
+      }
     };
 
     try {
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse(trajectoryEndpoint),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -336,13 +495,14 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         body: json.encode(data),
       );
 
-      if (response.statusCode == 202) {
+      if (response.statusCode == 200 || response.statusCode == 202) {
         deltaPoints.clear();
+        print('Batch uploaded successfully');
       } else {
-        debugPrint('Error sending trip data');
+        print('Error sending trip data: ${response.body}');
       }
     } catch (error) {
-      debugPrint('Error: $error');
+      print('Error: $error');
     }
   }
 
@@ -464,7 +624,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   }
 
   Widget _buildDeltaList(double screenHeight, double screenWidth) {
-    return Container(
+    return SizedBox(
       height: screenHeight * 0.2,
       child: Card(
         elevation: 8,
@@ -516,6 +676,37 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     );
   }
 
+  // Widget _buildMapView(double screenHeight, double screenWidth) {
+  //   return Container(
+  //     height: screenHeight * 0.25,
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(screenWidth * 0.03),
+  //       boxShadow: [
+  //         BoxShadow(color: Colors.black26, blurRadius: screenWidth * 0.015),
+  //       ],
+  //     ),
+  //     child: Padding(
+  //       padding: EdgeInsets.all(screenWidth * 0.02),
+  //       child:
+  //           deltaPointsClone.isNotEmpty
+  //               ? CustomPaint(
+  //                 painter: RoutePainter(deltaPointsClone),
+  //                 child: Container(),
+  //               )
+  //               : Center(
+  //                 child: Text(
+  //                   "No route data available",
+  //                   style: TextStyle(
+  //                     color: Colors.grey,
+  //                     fontSize: screenWidth * 0.04,
+  //                   ),
+  //                 ),
+  //               ),
+  //     ),
+  //   );
+  // }
+  // revert to above function if below causes issues
   Widget _buildMapView(double screenHeight, double screenWidth) {
     return Container(
       height: screenHeight * 0.25,
@@ -528,21 +719,50 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       ),
       child: Padding(
         padding: EdgeInsets.all(screenWidth * 0.02),
-        child:
-            deltaPointsClone.isNotEmpty
-                ? CustomPaint(
-                  painter: RoutePainter(deltaPointsClone),
-                  child: Container(),
-                )
-                : Center(
-                  child: Text(
-                    "No route data available",
+        child: Column(
+          children: [
+            // Speed display row
+            if (isTripStarted) 
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    'Current: ${currentSpeed.toStringAsFixed(1)} mph',
                     style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: screenWidth * 0.04,
+                      fontWeight: FontWeight.bold,
+                      fontSize: screenWidth * 0.035,
                     ),
                   ),
-                ),
+                  Text(
+                    'Max: ${maxSpeed.toStringAsFixed(1)} mph',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: screenWidth * 0.035,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            SizedBox(height: 8),
+            // Map visualization
+            Expanded(
+              child: deltaPointsClone.isNotEmpty
+                  ? CustomPaint(
+                      painter: RoutePainter(deltaPointsClone),
+                      child: Container(),
+                    )
+                  : Center(
+                      child: Text(
+                        "No route data available",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: screenWidth * 0.04,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

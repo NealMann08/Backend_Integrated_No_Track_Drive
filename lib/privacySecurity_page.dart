@@ -9,6 +9,8 @@ import 'package:flutter_settings_screens/flutter_settings_screens.dart';
 
 
 class PrivSecPage extends StatefulWidget {
+  const PrivSecPage({super.key});
+
   @override
   _PrivSecPageState createState() => _PrivSecPageState();
 }
@@ -27,13 +29,6 @@ class _PrivSecPageState extends State<PrivSecPage> {
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
-    if (token == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPageWidget()),
-      );
-    }
   }
   
   

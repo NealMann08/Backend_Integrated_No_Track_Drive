@@ -8,6 +8,8 @@ import 'package:flutter_settings_screens/flutter_settings_screens.dart';
 
 
 class NotificationsPage extends StatefulWidget {
+  const NotificationsPage({super.key});
+
   // Keys for SharedPreferences storage
 
   @override
@@ -28,13 +30,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
-
-    if (token == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => LoginPageWidget()),
-      );
-    }
   }
   
   

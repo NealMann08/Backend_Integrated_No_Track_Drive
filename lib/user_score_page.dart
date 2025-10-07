@@ -17,8 +17,8 @@ class UserScorePage extends StatefulWidget {
     this.isLoading = false,
     this.errorMessage = '',
     this.onSearchSubmitted,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   _UserScorePageState createState() => _UserScorePageState();
@@ -64,7 +64,7 @@ class _UserScorePageState extends State<UserScorePage> {
             ),
             SizedBox(height: 20),
             if (widget.isLoading)
-              Container(
+              SizedBox(
                 height: MediaQuery.of(context).size.height * 0.5,
                 child: Center(child: CircularProgressIndicator()),
               ),

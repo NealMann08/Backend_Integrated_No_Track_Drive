@@ -4,6 +4,15 @@ import 'package:flutter/material.dart';
 import 'current_trip_page.dart';
 import 'trip_helper.dart';
 
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:intl/intl.dart';
+
+import 'data_manager.dart'; // Add this import
+
+
 class UserHomePage extends StatefulWidget {
   final String firstName;
   final String lastName;
@@ -31,25 +40,155 @@ class _UserHomePageState extends State<UserHomePage> {
     _loadRecentTrips();
   }
 
+  // Future<void> _loadRecentTrips() async {
+  //   setState(() {
+  //     isLoading = true;
+  //     errorMessage = '';
+  //   });
+
+  //   try {
+  //     List<dynamic> trips = await TripService.fetchPreviousTrips();
+  //     setState(() {
+  //       recentTrips = trips.take(3).toList();
+  //       isLoading = false;
+  //     });
+  //   } catch (e) {
+  //     setState(() {
+  //       isLoading = false;
+  //       errorMessage = 'Failed to load recent trips';
+  //     });
+  //   }
+  // }
+  // revert to above function if below fails
+  // Future<void> _loadRecentTrips() async {
+  //   if (!mounted) return;
+    
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+    
+  //   // Check for cached data first
+  //   String? cachedTrips = prefs.getString('cached_trips');
+  //   String? cacheTime = prefs.getString('cache_time');
+    
+  //   // Use cache if less than 5 minutes old
+  //   if (cachedTrips != null && cacheTime != null) {
+  //     try {
+  //       DateTime cached = DateTime.parse(cacheTime);
+  //       if (DateTime.now().difference(cached).inMinutes < 5) {
+  //         List<dynamic> trips = json.decode(cachedTrips);
+  //         if (mounted) {
+  //           setState(() {
+  //             recentTrips = trips.take(3).toList();
+  //             isLoading = false;
+  //           });
+  //         }
+  //         return; // Exit early with cached data
+  //       }
+  //     } catch (e) {
+  //       // If cache is corrupted, continue to fetch fresh data
+  //       print('Cache error: $e');
+  //     }
+  //   }
+    
+  //   // If no valid cache, show loading and fetch fresh data
+  //   setState(() {
+  //     isLoading = true;
+  //     errorMessage = '';
+  //   });
+
+  //   String? userDataJson = prefs.getString('user_data');
+    
+  //   if (userDataJson == null) {
+  //     if (mounted) {
+  //       setState(() {
+  //         recentTrips = [];
+  //         isLoading = false;
+  //       });
+  //     }
+  //     return;
+  //   }
+    
+  //   Map<String, dynamic> userData = json.decode(userDataJson);
+  //   String userEmail = userData['email'] ?? '';
+    
+  //   try {
+  //     // Use YOUR analyze-driver endpoint
+  //     final response = await http.get(
+  //       Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=$userEmail'),
+  //     );
+      
+  //     if (response.statusCode == 200) {
+  //       final data = json.decode(response.body);
+  //       List<dynamic> trips = data['trips'] ?? [];
+        
+  //       // Cache the trips for faster loading next time
+  //       await prefs.setString('cached_trips', json.encode(trips));
+  //       await prefs.setString('cache_time', DateTime.now().toIso8601String());
+        
+  //       if (mounted) {
+  //         setState(() {
+  //           // Take only the 3 most recent trips
+  //           recentTrips = trips.take(3).toList();
+  //           isLoading = false;
+  //         });
+  //       }
+  //     } else {
+  //       if (mounted) {
+  //         setState(() {
+  //           recentTrips = [];
+  //           isLoading = false;
+  //         });
+  //       }
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       setState(() {
+  //         recentTrips = [];
+  //         isLoading = false;
+  //         errorMessage = '';  // Don't show error, just show empty state
+  //       });
+  //     }
+  //   }
+  // }
+  // revert to above function if below fails
   Future<void> _loadRecentTrips() async {
+    if (!mounted) return;
+    
     setState(() {
       isLoading = true;
       errorMessage = '';
     });
 
     try {
-      List<dynamic> trips = await TripService.fetchPreviousTrips();
-      setState(() {
-        recentTrips = trips.take(3).toList();
-        isLoading = false;
-      });
+      Map<String, dynamic>? analytics = await DataManager.getDriverAnalytics();
+      
+      if (analytics != null) {
+        List<dynamic> trips = analytics['trips'] ?? [];
+        
+        if (mounted) {
+          setState(() {
+            recentTrips = trips.take(3).toList();
+            isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            recentTrips = [];
+            isLoading = false;
+          });
+        }
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Failed to load recent trips';
-      });
+      if (mounted) {
+        setState(() {
+          recentTrips = [];
+          isLoading = false;
+          errorMessage = '';
+        });
+      }
     }
   }
+
 
   Widget _buildPreviousTripsSection() {
     return Card(
@@ -89,7 +228,21 @@ class _UserHomePageState extends State<UserHomePage> {
                           )
                         : Column(
                             children: recentTrips.take(3).map((trip) {
-                               
+                              // Parse the date properly from your backend
+                              String dateDisplay = "No date";
+                              String startTimeStr = trip['start_timestamp'] ?? '';
+                              if (startTimeStr.isNotEmpty) {
+                                try {
+                                  DateTime startTime = DateTime.parse(startTimeStr).toLocal(); // Convert to local time
+                                  dateDisplay = DateFormat('MMM d, yyyy • h:mm a').format(startTime);
+                                } catch (e) {
+                                  dateDisplay = "Invalid date";
+                                }
+                              }
+                              
+                              // Get distance from your backend field names
+                              double distance = (trip['total_distance_miles'] ?? 0.0).toDouble();
+                              
                               return Container(
                                 margin: EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
@@ -110,14 +263,14 @@ class _UserHomePageState extends State<UserHomePage> {
                                     ),
                                   ),
                                   title: Text(
-                                    TripService.formatTimestamp(trip['start_time'] ?? trip['timestamp']),
+                                    dateDisplay,
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  subtitle: Text( 
-                                    '${trip['distance']?.toStringAsFixed(2) ?? '0.00'} miles',
+                                  subtitle: Text(
+                                    '${distance.toStringAsFixed(2)} miles',
                                     style: TextStyle(
                                       color: Colors.white.withAlpha(204),
                                     ),

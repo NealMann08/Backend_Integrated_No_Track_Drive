@@ -100,29 +100,218 @@ static Future<List<Map<String, dynamic>>> searchInsurance(String query) async {
   }
 
 
+// static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
+//   // Handle both your backend format and Ryan's format
+//   DateTime startTime;
+//   DateTime endTime;
+//   double distance;
+//   double avgSpeed;
+//   double maxSpeed;
+//   double duration;
+  
+//   try {
+//     // Your backend uses 'start_timestamp' and 'end_timestamp'
+//     if (trip['start_timestamp'] != null) {
+//       startTime = DateTime.parse(trip['start_timestamp']);
+//       endTime = trip['end_timestamp'] != null 
+//         ? DateTime.parse(trip['end_timestamp'])
+//         : startTime.add(Duration(minutes: (trip['duration_minutes'] ?? 30).round()));
+//       duration = trip['duration_minutes'] ?? 0.0;
+//     } 
+//     // Ryan's format uses 'timestamp' and 'duration'
+//     else if (trip['timestamp'] != null) {
+//       if (trip['timestamp'] is String) {
+//         startTime = DateTime.parse(trip['timestamp']);
+//       } else {
+//         startTime = DateTime.fromMillisecondsSinceEpoch(trip['timestamp'] * 1000);
+//       }
+//       duration = (trip['duration'] ?? 0).toDouble();
+//       endTime = startTime.add(Duration(minutes: duration.round()));
+//     } else {
+//       startTime = DateTime.now();
+//       endTime = DateTime.now();
+//       duration = 0.0;
+//     }
+//   } catch (e) {
+//     startTime = DateTime.now();
+//     endTime = DateTime.now();
+//     duration = 0.0;
+//   }
+
+//   // Use your backend's field names with fallbacks to Ryan's names
+//   distance = (trip['total_distance_miles'] ?? trip['distance'] ?? 0.0).toDouble();
+//   avgSpeed = (trip['avg_speed_mph'] ?? trip['velocity'] ?? trip['average_speed'] ?? 0.0).toDouble();
+//   maxSpeed = (trip['max_speed_mph'] ?? trip['max_velocity'] ?? trip['max_speed'] ?? 0.0).toDouble();
+
+//   showModalBottomSheet(
+//     context: context,
+//     isScrollControlled: true,
+//     backgroundColor: Colors.white,
+//     shape: const RoundedRectangleBorder(
+//       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//     ),
+//     builder: (context) {
+//       return DraggableScrollableSheet(
+//         expand: false,
+//         initialChildSize: 0.6,
+//         minChildSize: 0.3,
+//         maxChildSize: 0.95,
+//         builder: (context, scrollController) {
+//           return SingleChildScrollView(
+//             controller: scrollController,
+//             padding: const EdgeInsets.all(20.0),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Center(
+//                   child: Container(
+//                     width: 40,
+//                     height: 4,
+//                     margin: const EdgeInsets.only(bottom: 16),
+//                     decoration: BoxDecoration(
+//                       color: Colors.grey[300],
+//                       borderRadius: BorderRadius.circular(2),
+//                     ),
+//                   ),
+//                 ),
+//                 Text(
+//                   "Trip Details",
+//                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
+//                         fontWeight: FontWeight.bold,
+//                         color: Colors.black,
+//                       ),
+//                 ),
+//                 const SizedBox(height: 16),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.calendar_today,
+//                   "Date:",
+//                   DateFormat('MMM dd, yyyy').format(startTime),
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.access_time,
+//                   "Start Time:",
+//                   DateFormat('hh:mm a').format(startTime),
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.timer,
+//                   "Duration:",
+//                   "${duration.toStringAsFixed(1)} minutes",
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.timer,
+//                   "End Time:",
+//                   DateFormat('hh:mm a').format(endTime),
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.directions_car,
+//                   "Distance:",
+//                   "${distance.toStringAsFixed(2)} miles",
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.speed,
+//                   "Max Speed:",
+//                   "${maxSpeed.toStringAsFixed(1)} mph",
+//                 ),
+//                 _buildDetailRow(
+//                   context,
+//                   Icons.speed,
+//                   "Average Speed:",
+//                   "${avgSpeed.toStringAsFixed(1)} mph",
+//                 ),
+//                 const SizedBox(height: 20),
+//               ],
+//             ),
+//           );
+//         },
+//       );
+//     },
+//   );
+// }
+// revert to above if below breaks
 static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
-  // Parse the start time
+  // Extract timestamps with proper fallback
   DateTime startTime;
+  DateTime endTime;
+  double distance;
+  double avgSpeed;
+  double maxSpeed;
+  double duration;
+  
+  // Extract harsh events
+  int suddenAccelerations = 0;
+  int suddenDecelerations = 0;
+  int hardStops = 0;
+  int dangerousTurns = 0;
+  int safeTurns = 0;
+  
   try {
-    if (trip['timestamp'] is String) {
-      startTime = DateTime.parse(trip['timestamp']);
-    } else if (trip['timestamp'] is int) {
-      startTime = DateTime.fromMillisecondsSinceEpoch(trip['timestamp'] * 1000);
+    // Primary: Use insurance_home_page format (start_time, end_time, duration, avg_speed)
+    if (trip['start_time'] != null) {
+      startTime = DateTime.parse(trip['start_time']).toLocal();
+      endTime = trip['end_time'] != null 
+        ? DateTime.parse(trip['end_time']).toLocal()
+        : startTime;
+      duration = (trip['duration'] ?? 0).toDouble();
+      avgSpeed = (trip['avg_speed'] ?? 0).toDouble();
+      maxSpeed = (trip['max_speed'] ?? 0).toDouble();
+      distance = (trip['distance'] ?? 0).toDouble();
+    }
+    // Fallback: Backend format (start_timestamp, end_timestamp, duration_minutes, avg_speed_mph)
+    else if (trip['start_timestamp'] != null) {
+      startTime = DateTime.parse(trip['start_timestamp']).toLocal();
+      endTime = trip['end_timestamp'] != null 
+        ? DateTime.parse(trip['end_timestamp']).toLocal()
+        : startTime;
+      duration = (trip['duration_minutes'] ?? 0).toDouble();
+      avgSpeed = (trip['avg_speed_mph'] ?? 0).toDouble();
+      maxSpeed = (trip['max_speed_mph'] ?? 0).toDouble();
+      distance = (trip['total_distance_miles'] ?? 0).toDouble();
+    }
+    // Last resort: Ryan's format
+    else if (trip['timestamp'] != null) {
+      if (trip['timestamp'] is String) {
+        startTime = DateTime.parse(trip['timestamp']).toLocal();
+      } else {
+        startTime = DateTime.fromMillisecondsSinceEpoch(trip['timestamp'] * 1000);
+      }
+      duration = (trip['duration'] ?? 0).toDouble();
+      endTime = startTime.add(Duration(minutes: duration.round()));
+      avgSpeed = (trip['average_speed'] ?? 0).toDouble();
+      maxSpeed = (trip['max_speed'] ?? 0).toDouble();
+      distance = (trip['distance'] ?? 0).toDouble();
     } else {
       startTime = DateTime.now();
+      endTime = DateTime.now();
+      duration = 0.0;
+      avgSpeed = 0.0;
+      maxSpeed = 0.0;
+      distance = 0.0;
     }
+    
+    // Extract harsh events with proper field names
+    suddenAccelerations = (trip['sudden_accelerations'] ?? 0) as int;
+    suddenDecelerations = (trip['sudden_decelerations'] ?? 0) as int;
+    hardStops = (trip['hard_stops'] ?? 0) as int;
+    dangerousTurns = (trip['dangerous_turns'] ?? 0) as int;
+    safeTurns = (trip['safe_turns'] ?? 0) as int;
+    
   } catch (e) {
+    print("Error parsing trip data: $e");
     startTime = DateTime.now();
+    endTime = DateTime.now();
+    duration = 0.0;
+    avgSpeed = 0.0;
+    maxSpeed = 0.0;
+    distance = 0.0;
   }
 
-  // Calculate duration - convert from minutes to milliseconds if needed
-  double durationMinutes = (trip['duration'] ?? 0).toDouble();
-  DateTime endTime = startTime.add(Duration(minutes: durationMinutes.round()));
-
-  final avgSpeed = trip['velocity']?.toDouble() ?? 0.0;
-  final maxSpeed = trip['max_velocity']?.toDouble() ?? 0.0;
-
-showModalBottomSheet(
+  showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.white,
@@ -132,8 +321,8 @@ showModalBottomSheet(
     builder: (context) {
       return DraggableScrollableSheet(
         expand: false,
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
         maxChildSize: 0.95,
         builder: (context, scrollController) {
           return SingleChildScrollView(
@@ -161,6 +350,10 @@ showModalBottomSheet(
                       ),
                 ),
                 const SizedBox(height: 16),
+                Divider(),
+                const SizedBox(height: 8),
+                
+                // Basic trip info
                 _buildDetailRow(
                   context,
                   Icons.calendar_today,
@@ -171,38 +364,99 @@ showModalBottomSheet(
                   context,
                   Icons.access_time,
                   "Start Time:",
-                  DateFormat('hh:mm a').format(startTime),
+                  DateFormat('h:mm a').format(startTime),
+                ),
+                _buildDetailRow(
+                  context,
+                  Icons.timer_off,
+                  "End Time:",
+                  DateFormat('h:mm a').format(endTime),
                 ),
                 _buildDetailRow(
                   context,
                   Icons.timer,
                   "Duration:",
-                  "${durationMinutes.toStringAsFixed(1)} minutes",
-                ),
-                _buildDetailRow(
-                  context,
-                  Icons.timer,
-                  "End Time:",
-                  DateFormat('hh:mm a').format(endTime),
+                  "${duration.toStringAsFixed(1)} minutes",
                 ),
                 _buildDetailRow(
                   context,
                   Icons.directions_car,
                   "Distance:",
-                  "${trip['distance']?.toStringAsFixed(2) ?? 'N/A'} miles",
+                  "${distance.toStringAsFixed(2)} miles",
                 ),
-            _buildDetailRow(
-              context,
-              Icons.speed,
-              "Max Speed:",
-              "${maxSpeed.toStringAsFixed(1)} mph",
-            ),
-                        _buildDetailRow(
-              context,
-              Icons.speed,
-              "Average Speed:",
-              "${avgSpeed.toStringAsFixed(1)} mph",
-            ),
+                _buildDetailRow(
+                  context,
+                  Icons.speed,
+                  "Average Speed:",
+                  "${avgSpeed.toStringAsFixed(1)} mph",
+                ),
+                _buildDetailRow(
+                  context,
+                  Icons.speed,
+                  "Max Speed:",
+                  "${maxSpeed.toStringAsFixed(1)} mph",
+                ),
+                
+                // Harsh Events Section
+                const SizedBox(height: 20),
+                Text(
+                  "Harsh Events",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[900],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildEventBadge(
+                      context,
+                      "Sudden\nAccel",
+                      suddenAccelerations,
+                      Colors.orange,
+                      Icons.speed,
+                    ),
+                    _buildEventBadge(
+                      context,
+                      "Sudden\nDecel",
+                      suddenDecelerations,
+                      Colors.red,
+                      Icons.trending_down,
+                    ),
+                    _buildEventBadge(
+                      context,
+                      "Hard\nStops",
+                      hardStops,
+                      Colors.purple,
+                      Icons.stop_circle,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildEventBadge(
+                      context,
+                      "Dangerous\nTurns",
+                      dangerousTurns,
+                      Colors.deepOrange,
+                      Icons.rotate_right,
+                    ),
+                    _buildEventBadge(
+                      context,
+                      "Safe\nTurns",
+                      safeTurns,
+                      Colors.green,
+                      Icons.check_circle,
+                    ),
+                    SizedBox(width: 60), // Spacer for alignment
+                  ],
+                ),
+                
                 const SizedBox(height: 20),
               ],
             ),
@@ -212,6 +466,52 @@ showModalBottomSheet(
     },
   );
 }
+
+static Widget _buildEventBadge(
+  BuildContext context,
+  String label,
+  int count,
+  Color color,
+  IconData icon,
+) {
+  return Column(
+    children: [
+      Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 2),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 10),
+        maxLines: 2,
+      ),
+    ],
+  );
+}
+
+
 static Widget buildTripListItem(BuildContext context, Map<String, dynamic> trip) {
   final avgSpeed = trip['average_speed']?.toDouble() ?? 0.0;
   
@@ -256,80 +556,82 @@ static Widget _buildDetailRow(BuildContext context, IconData icon, String label,
 }
 
 static Future<List<Map<String, dynamic>>> fetchPreviousTripsData() async {
-  final String url = '$server/previoustrips';
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? token = prefs.getString('access_token');
+  // final String url = '$server/previoustrips';
+  // SharedPreferences prefs = await SharedPreferences.getInstance();
+  // String? token = prefs.getString('access_token');
 
-  try {
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
+  // try {
+  //   final response = await http.get(
+  //     Uri.parse(url),
+  //     headers: {
+  //       'Authorization': 'Bearer $token',
+  //       'Content-Type': 'application/json',
+  //     },
+  //   );
 
-    if (response.statusCode == 200) {
-      List<dynamic> data = json.decode(response.body);
+  //   if (response.statusCode == 200) {
+  //     List<dynamic> data = json.decode(response.body);
       
-      // Transform the data to include both original and new fields
-      return data.map((trip) {
-        // Original fields
-        Map<String, dynamic> tripData = {
-          'trip_id': trip['trip_id'],
-          'user_id': trip['user_id'],
-          'timestamp': trip['timestamp'],
-          'distance': (trip['distance'] ?? 0).toDouble(),
-          'duration': (trip['duration'] ?? 0).toDouble(),
-          'average_speed': (trip['average_speed'] ?? 0).toDouble(),
-          'max_speed': (trip['max_speed'] ?? 0).toDouble(),
-          'data': trip['data'], // Original trip data if exists
-        };
+  //     // Transform the data to include both original and new fields
+  //     return data.map((trip) {
+  //       // Original fields
+  //       Map<String, dynamic> tripData = {
+  //         'trip_id': trip['trip_id'],
+  //         'user_id': trip['user_id'],
+  //         'timestamp': trip['timestamp'],
+  //         'distance': (trip['distance'] ?? 0).toDouble(),
+  //         'duration': (trip['duration'] ?? 0).toDouble(),
+  //         'average_speed': (trip['average_speed'] ?? 0).toDouble(),
+  //         'max_speed': (trip['max_speed'] ?? 0).toDouble(),
+  //         'data': trip['data'], // Original trip data if exists
+  //       };
 
-        // New score-related fields (with fallbacks if not available)
-        tripData.addAll({
-          'brake_score': (trip['brake_score'] ?? trip['metrics']?['brake_score'] ?? 0).toDouble(),
-          'accel_score': (trip['accel_score'] ?? trip['metrics']?['accel_score'] ?? 0).toDouble(),
-          'trip_score': (trip['trip_score'] ?? trip['metrics']?['trip_score'] ?? 0).toDouble(),
-          // Convert scores if they're stored as percentages (e.g., 85 instead of 0.85)
-          'brake_score_percent': ((trip['brake_score'] ?? trip['metrics']?['brake_score'] ?? 0) * 100).toDouble(),
-          'accel_score_percent': ((trip['accel_score'] ?? trip['metrics']?['accel_score'] ?? 0) * 100).toDouble(),
-          'trip_score_percent': ((trip['trip_score'] ?? trip['metrics']?['trip_score'] ?? 0) * 100).toDouble(),
-        });
+  //       // New score-related fields (with fallbacks if not available)
+  //       tripData.addAll({
+  //         'brake_score': (trip['brake_score'] ?? trip['metrics']?['brake_score'] ?? 0).toDouble(),
+  //         'accel_score': (trip['accel_score'] ?? trip['metrics']?['accel_score'] ?? 0).toDouble(),
+  //         'trip_score': (trip['trip_score'] ?? trip['metrics']?['trip_score'] ?? 0).toDouble(),
+  //         // Convert scores if they're stored as percentages (e.g., 85 instead of 0.85)
+  //         'brake_score_percent': ((trip['brake_score'] ?? trip['metrics']?['brake_score'] ?? 0) * 100).toDouble(),
+  //         'accel_score_percent': ((trip['accel_score'] ?? trip['metrics']?['accel_score'] ?? 0) * 100).toDouble(),
+  //         'trip_score_percent': ((trip['trip_score'] ?? trip['metrics']?['trip_score'] ?? 0) * 100).toDouble(),
+  //       });
 
-        return tripData;
-      }).toList();
-    } else {
-      throw Exception('Failed to fetch trips: ${response.statusCode}');
-    }
-  } catch (error) {
-    throw Exception('Failed to fetch trips: $error');
-  }
+  //       return tripData;
+  //     }).toList();
+  //   } else {
+  //     throw Exception('Failed to fetch trips: ${response.statusCode}');
+  //   }
+  // } catch (error) {
+  //   throw Exception('Failed to fetch trips: $error');
+  // }
+  return [];
 }
 
   static Future<List<dynamic>> fetchPreviousTrips() async {
-    final String url = '$server/previoustrips';
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('access_token');
+    // final String url = '$server/previoustrips';
+    // SharedPreferences prefs = await SharedPreferences.getInstance();
+    // String? token = prefs.getString('access_token');
 
-    try {
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+    // try {
+    //   final response = await http.get(
+    //     Uri.parse(url),
+    //     headers: {
+    //       'Authorization': 'Bearer $token',
+    //       'Content-Type': 'application/json',
+    //     },
+    //   );
 
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        return data; 
-      } else {
-        return [];
-      }
-    } catch (error) {
-       return [];
-    }
+    //   if (response.statusCode == 200) {
+    //     List<dynamic> data = json.decode(response.body);
+    //     return data; 
+    //   } else {
+    //     return [];
+    //   }
+    // } catch (error) {
+    //    return [];
+    // }
+    return [];
   }
 
 static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
@@ -473,9 +775,10 @@ static String formatTimestamp(dynamic timestamp,{bool dateOnly = false}) {
     else if (timestamp is String) {
       // Try ISO 8601 format first (most common API format)
       if (timestamp.contains("T")) {
-        print("containts T");
-      final dateTime = DateTime.parse(timestamp).toUtc().toLocal();
-      return DateFormat('MM/dd/yyyy HH:mm').format(dateTime);
+        final dateTime = DateTime.parse(timestamp).toUtc().toLocal();
+        return dateOnly 
+          ? DateFormat('MMM d, yyyy').format(dateTime)
+          : DateFormat('MMM d, yyyy • h:mm a').format(dateTime);
       } 
       // Try common alternate formats
       else if (timestamp.contains("/")) {

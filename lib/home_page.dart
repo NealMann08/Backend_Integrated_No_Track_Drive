@@ -3,16 +3,20 @@ import 'package:flutter/foundation.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import 'custom_app_bar.dart';
 import 'user_home_page.dart';
 import 'insurance_home_page.dart';
 import 'admin_home_page.dart';
 
+import 'data_manager.dart'; // Add this import
+
+
 class HomePage extends StatefulWidget {
   final String role;
 
-  const HomePage({Key? key, required this.role}) : super(key: key);
+  const HomePage({super.key, required this.role});
 
   @override
   HomePageState createState() => HomePageState();
@@ -32,27 +36,85 @@ class HomePageState extends State<HomePage> {
     super.initState();
     _checkAuthToken();
     _loadProfileImage();
+    _preloadUserData(); // Add this
+
   }
+
+  void _preloadUserData() async {
+    // Preload all user data in the background
+    DataManager.preloadData();
+  }
+
+
+  // Future<void> _checkAuthToken() async {
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   String? token = prefs.getString('access_token');
+
+  //   Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+
+  //   setState(() {
+  //     role = decodedToken['role'];
+  //     firstName = decodedToken['first_name'];
+  //     lastName = decodedToken['last_name'];
+  //     email = decodedToken['email'];
+  //     isLoading = false;
+  //   });
+
+  //   await prefs.setString('role', role);
+  //   await prefs.setString('first_name', firstName);
+  //   await prefs.setString('last_name', lastName);
+  //   await prefs.setString('email', email);
+  //   }
+
+  //uncomment above code if below function causes issues
 
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
+    String? userDataJson = prefs.getString('user_data');
 
-    if (token != null) {
-      Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
+    if (token != null && userDataJson != null) {
+      try {
+        // Try to decode as JWT first (for backward compatibility)
+        Map<String, dynamic> decodedToken;
+        try {
+          decodedToken = JwtDecoder.decode(token);
+        } catch (e) {
+          // If JWT decode fails, decode our base64 JSON format
+          final decodedBytes = base64.decode(token);
+          final decodedString = utf8.decode(decodedBytes);
+          decodedToken = json.decode(decodedString);
+        }
 
-      setState(() {
-        role = decodedToken['role'];
-        firstName = decodedToken['first_name'];
-        lastName = decodedToken['last_name'];
-        email = decodedToken['email'];
-        isLoading = false;
-      });
+        // Also parse the user_data we stored
+        Map<String, dynamic> userData = json.decode(userDataJson);
 
-      await prefs.setString('role', role);
-      await prefs.setString('first_name', firstName);
-      await prefs.setString('last_name', lastName);
-      await prefs.setString('email', email);
+        setState(() {
+          role = decodedToken['role'] ?? widget.role;
+          // Parse name from userData (your backend stores full name, not split)
+          String fullName = userData['name'] ?? '';
+          List<String> nameParts = fullName.split(' ');
+          firstName = nameParts.isNotEmpty ? nameParts[0] : '';
+          lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+          email = userData['email'] ?? decodedToken['email'] ?? '';
+          isLoading = false;
+        });
+
+        await prefs.setString('role', role);
+        await prefs.setString('first_name', firstName);
+        await prefs.setString('last_name', lastName);
+        await prefs.setString('email', email);
+      } catch (e) {
+        debugPrint('Error decoding token: $e');
+        // Fall back to using the role passed from login
+        setState(() {
+          role = widget.role;
+          firstName = 'User';
+          lastName = '';
+          email = '';
+          isLoading = false;
+        });
+      }
     } else {
       debugPrint('No token found in SharedPreferences');
       setState(() => isLoading = false);

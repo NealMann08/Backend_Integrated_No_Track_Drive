@@ -15,8 +15,8 @@ class UserLookupPage extends StatefulWidget {
     this.isLoading = false,
     this.errorMessage = '',
     this.initialSearchQuery = '',
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   _UserLookupPageState createState() => _UserLookupPageState();

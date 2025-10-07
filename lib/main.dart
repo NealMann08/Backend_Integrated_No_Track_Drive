@@ -1,3 +1,5 @@
+import 'package:drive_guard/admin_home_page.dart';
+import 'package:drive_guard/insurance_home_page.dart';
 import 'package:flutter/material.dart';
 import 'login_page.dart'; // Ensure you import the correct file
 import 'package:flutter_settings_screens/flutter_settings_screens.dart';
@@ -15,6 +17,8 @@ void main()  async{
 
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -24,6 +28,10 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       home: LoginPageWidget(), // Correct the reference here
+      // home: AdminHomePage(),
+      // home: InsuranceHomePage(),
+
+
     );
   }
 }

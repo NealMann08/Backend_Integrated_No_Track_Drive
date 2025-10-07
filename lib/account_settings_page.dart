@@ -11,6 +11,8 @@ import 'login_page.dart'; // Import for LoginPageWidget navigation
 // AccountSettingsPage provides a simple interface for account management.
 // Currently contains only logout functionality but can be expanded with more settings.
 class AccountSettingsPage extends StatelessWidget {
+  const AccountSettingsPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,7 +56,6 @@ class AccountSettingsPage extends StatelessWidget {
                   (route) => false, 
                 );
               },
-              child: Text('Logout'),
               style: ElevatedButton.styleFrom(
                 // Custom green color
                 backgroundColor: Color(0xFF7AC143), 
@@ -73,6 +74,7 @@ class AccountSettingsPage extends StatelessWidget {
                 // Shadow depth
                 elevation: 5, 
               ),
+              child: Text('Logout'),
             ),
           ],
         ),

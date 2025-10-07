@@ -4,6 +4,11 @@ import 'custom_app_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'trip_helper.dart';
 import 'current_trip_page.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import '../data_manager.dart'; // Add this import
+
 
 class PreviousTripsPage extends StatefulWidget {
   const PreviousTripsPage({super.key});
@@ -15,7 +20,7 @@ class PreviousTripsPage extends StatefulWidget {
 class PreviousTripsPageState extends State<PreviousTripsPage> {
   String _selectedTimeFilter = 'All';
 
-  List<String> _timeFilters = [
+  final List<String> _timeFilters = [
     'All',
     'Past Year',
     'Past Month',
@@ -42,17 +47,84 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
     setState(() => isLoading = false);
   }
 
+  // Future<void> fetchPreviousTrips() async {
+  //   setState(() => isLoading = true);
+  //   List<dynamic> data = await TripService.fetchPreviousTrips();
+  //   if (mounted) {
+  //     setState(() {
+  //       trips = data;
+  //       _sortTrips();
+  //       isLoading = false;
+  //     });
+  //   }
+  // }
+  // revert to above if below causes issues
+  // Future<void> fetchPreviousTrips() async {
+  //   if (!mounted) return;  // ADD THIS LINE
+  //   setState(() => isLoading = true);
+    
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   String? userDataJson = prefs.getString('user_data');
+    
+  //   if (userDataJson == null) {
+  //     if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //     return;
+  //   }
+    
+  //   Map<String, dynamic> userData = json.decode(userDataJson);
+  //   String userEmail = userData['email'] ?? '';
+    
+  //   try {
+  //     final response = await http.get(
+  //       Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=$userEmail'),
+  //       headers: {
+  //         'Authorization': 'Bearer ${prefs.getString('access_token')}',
+  //       },
+  //     );
+      
+  //     if (response.statusCode == 200) {
+  //       final data = json.decode(response.body);
+  //       if (mounted) {  // ADD mounted check
+  //         setState(() {
+  //           trips = data['trips'] ?? [];
+  //           _sortTrips();
+  //           isLoading = false;
+  //         });
+  //       }
+  //     } else {
+  //       if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //     }
+  //   } catch (error) {
+  //     print('Error fetching trips: $error');
+  //     if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //   }
+  // }
+  // revert to above if below causes issues
   Future<void> fetchPreviousTrips() async {
+    if (!mounted) return;
     setState(() => isLoading = true);
-    List<dynamic> data = await TripService.fetchPreviousTrips();
-    if (mounted) {
-      setState(() {
-        trips = data;
-        _sortTrips();
-        isLoading = false;
-      });
+    
+    try {
+      Map<String, dynamic>? analytics = await DataManager.getDriverAnalytics();
+      
+      if (analytics != null) {
+        setState(() {
+          trips = analytics['trips'] ?? [];
+          _sortTrips();
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          trips = [];
+          isLoading = false;
+        });
+      }
+    } catch (error) {
+      print('Error fetching trips: $error');
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
 
   void _sortTrips() {
     if (_filter == 'recent') {
@@ -76,20 +148,60 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
     );
   }
 
+  // List<Map<String, dynamic>> getFilteredTrips() {
+  //   final now = DateTime.now();
+
+  //   return trips
+  //       .whereType<Map<String, dynamic>>() // ✅ filters and casts
+  //       .where((trip) {
+  //         final timestamp =
+  //             trip['timestamp'] is int
+  //                 ? trip['timestamp']
+  //                 : DateTime.parse(trip['timestamp']).millisecondsSinceEpoch ~/
+  //                     1000;
+  //         final tripDate = DateTime.fromMillisecondsSinceEpoch(
+  //           timestamp * 1000,
+  //         );
+
+  //         switch (_selectedTimeFilter) {
+  //           case 'Past Year':
+  //             return tripDate.isAfter(now.subtract(Duration(days: 365)));
+  //           case 'Past Month':
+  //             return tripDate.isAfter(now.subtract(Duration(days: 30)));
+  //           case 'Past Week':
+  //             return tripDate.isAfter(now.subtract(Duration(days: 7)));
+  //           case 'Past Day':
+  //             return tripDate.isAfter(now.subtract(Duration(days: 1)));
+  //           default:
+  //             return true;
+  //         }
+  //       })
+  //       .toList();
+  // }
+  // revert to above if below causes issues
   List<Map<String, dynamic>> getFilteredTrips() {
     final now = DateTime.now();
 
     return trips
-        .whereType<Map<String, dynamic>>() // ✅ filters and casts
+        .whereType<Map<String, dynamic>>()
         .where((trip) {
-          final timestamp =
-              trip['timestamp'] is int
-                  ? trip['timestamp']
-                  : DateTime.parse(trip['timestamp']).millisecondsSinceEpoch ~/
-                      1000;
-          final tripDate = DateTime.fromMillisecondsSinceEpoch(
-            timestamp * 1000,
-          );
+          // Handle both your backend and Ryan's formats safely
+          dynamic timestampValue = trip['start_timestamp'] ?? trip['timestamp'];
+          
+          if (timestampValue == null) return true; // Include trips without timestamps
+          
+          DateTime tripDate;
+          try {
+            if (timestampValue is String) {
+              tripDate = DateTime.parse(timestampValue);
+            } else if (timestampValue is int) {
+              tripDate = DateTime.fromMillisecondsSinceEpoch(timestampValue * 1000);
+            } else {
+              return true; // Include if we can't parse
+            }
+          } catch (e) {
+            return true; // Include if parsing fails
+          }
 
           switch (_selectedTimeFilter) {
             case 'Past Year':
@@ -199,7 +311,7 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
             filled: true,
             fillColor: Colors.grey[100],
           ),
-          value: _selectedTimeFilter,
+          initialValue: _selectedTimeFilter,
           items: _timeFilters.map((String filter) {
             return DropdownMenuItem<String>(
               value: filter,
@@ -273,75 +385,94 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
 
                                   itemBuilder: (context, index) {
                                     final trip = filteredTrips[index];
-
-                                    final timestamp =
-                                        trip['timestamp'] is int
-                                            ? trip['timestamp']
-                                            : DateTime.parse(
-                                                  trip['timestamp'],
-                                                ).millisecondsSinceEpoch ~/
-                                                1000;
-                                    final date =
-                                        DateTime.fromMillisecondsSinceEpoch(
-                                          timestamp * 1000,
-                                        );
-
+                                    
+                                    // Parse date from your backend format
+                                    String dateDisplay = "No date";
+                                    String timeDisplay = "";
+                                    DateTime? tripDate;
+                                    
+                                    String startTimeStr = trip['start_timestamp'] ?? '';
+                                    if (startTimeStr.isNotEmpty) {
+                                      try {
+                                        tripDate = DateTime.parse(startTimeStr).toLocal();
+                                        dateDisplay = DateFormat('MMM dd, yyyy').format(tripDate);
+                                        timeDisplay = DateFormat('hh:mm a').format(tripDate);
+                                      } catch (e) {
+                                        print('Error parsing date: $e');
+                                      }
+                                    }
+                                    
+                                    // Get distance and score from your backend
+                                    double distance = (trip['total_distance_miles'] ?? 0.0).toDouble();
+                                    int tripScore = (trip['behavior_score'] ?? 0).toInt();
+                                    
+                                    // Determine score color
+                                    Color scoreColor = tripScore >= 80 ? Colors.green : 
+                                                      tripScore >= 60 ? Colors.orange : Colors.red;
+                                    
                                     return Card(
                                       elevation: 2,
                                       color: Colors.white,
-                                      margin: const EdgeInsets.symmetric(
-                                        vertical: 4,
-                                      ),
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(8),
-                                        side: BorderSide(
-                                          color: Colors.grey[300]!,
-                                        ),
+                                        side: BorderSide(color: Colors.grey[300]!),
                                       ),
                                       child: ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 12,
-                                            ),
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
                                         leading: Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
                                             color: Colors.blue[50],
                                             shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Colors.blue[100]!,
-                                            ),
+                                            border: Border.all(color: Colors.blue[100]!),
                                           ),
                                           child: Icon(
                                             Icons.directions_car,
                                             color: Colors.blue[800],
                                           ),
                                         ),
-                                        title: Text(
-                                          DateFormat(
-                                            'MMM dd, yyyy',
-                                          ).format(date),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black,
-                                          ),
+                                        title: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                dateDisplay,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: scoreColor.withOpacity(0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(color: scoreColor),
+                                              ),
+                                              child: Text(
+                                                'Score: $tripScore',
+                                                style: TextStyle(
+                                                  color: scoreColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         subtitle: Text(
-                                          "${trip['distance']?.toStringAsFixed(2) ?? '0.00'} miles • ${DateFormat('hh:mm a').format(date)}",
-                                          style: TextStyle(
-                                            color: Colors.grey[800],
-                                          ),
+                                          "${distance.toStringAsFixed(2)} miles • $timeDisplay",
+                                          style: TextStyle(color: Colors.grey[800]),
                                         ),
                                         trailing: Icon(
                                           Icons.chevron_right,
                                           color: Colors.blue[800],
                                         ),
-                                        onTap:
-                                            () => TripService.showTripDetails(
-                                              context,
-                                              trip,
-                                            ),
+                                        onTap: () => TripService.showTripDetails(context, trip),
                                       ),
                                     );
                                   },

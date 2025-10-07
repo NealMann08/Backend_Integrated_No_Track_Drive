@@ -10,8 +10,12 @@ import 'graph_Score_Page.dart';
 import 'trip_helper.dart';
 import 'ipconfig.dart';
 
+import 'data_manager.dart'; // Add this import
+
 
 class ScorePage extends StatefulWidget {
+  const ScorePage({super.key});
+
   @override
   _ScorePage createState() => _ScorePage();
 }
@@ -44,59 +48,181 @@ class _ScorePage extends State<ScorePage> {
   }
 
   // Loads the type of user (user, admin, service provider)
+  // Future<void> _loadUserInfo() async {
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+
+  //   role = prefs.getString('role')!;
+
+  //   final token = prefs.getString('access_token');
+
+  //   final responseScore = await http.get(
+  //     Uri.parse('$server/score'), 
+  //     headers: {
+  //       'Authorization': 'Bearer $token',
+  //       'Content-Type': 'application/json',
+  //     },
+  //   );
+
+
+  //   // TODO Replace breakdown with correct names in database
+  //   if (responseScore.statusCode == 200) {
+  //       final data = json.decode(responseScore.body);
+  //       setState(() {
+  //         isLoading = false;
+
+  //           final rawScore = data['totalScore'] ?? 0.0;
+  //           final roundedScore = double.parse(rawScore.toStringAsFixed(2));
+
+  //           score = (roundedScore * 100).toInt();
+  //         print('User Score : $score');
+  //         breakdown = {
+  //           "Braking": _ratingLabel(data['braking']),
+  //           "Acceleration": _ratingLabel(data['acceleration']),
+  //         };
+  //       });
+  //     } else {
+  //       print('Failed to load score');
+  //       setState(() {
+  //         isLoading = false;
+  //       });
+  //     }
+
+
+  //   final responsePrevTrips = await http.get(
+  //       Uri.parse('$server/previoustrips'), 
+  //       headers: {
+  //           'Authorization': 'Bearer $token',
+  //           'Content-Type': 'application/json',
+  //       }
+  //   );
+
+  //   if (responsePrevTrips.statusCode == 200) {
+  //       final data = json.decode(responsePrevTrips.body);
+  //       //TODO 
+  //   }
+  // }
+  // revert to above function if below function causes issues
+  // Future<void> _loadUserInfo() async {
+  //   if (!mounted) return;  // ADD THIS LINE
+    
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   role = prefs.getString('role')!;
+    
+  //   // Get user data to extract email
+  //   String? userDataJson = prefs.getString('user_data');
+  //   if (userDataJson == null) {
+  //     if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //     return;
+  //   }
+    
+  //   Map<String, dynamic> userData = json.decode(userDataJson);
+  //   String userEmail = userData['email'] ?? '';
+    
+  //   if (userEmail.isEmpty) {
+  //     print('No email found for user');
+  //     if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //     return;
+  //   }
+    
+  //   try {
+  //     // Call your analyze-driver endpoint with email
+  //     final response = await http.get(
+  //       Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=$userEmail'),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //     );
+      
+  //     if (response.statusCode == 200) {
+  //       final data = json.decode(response.body);
+        
+  //       if (mounted) {  // ADD mounted check
+  //         setState(() {
+  //           isLoading = false;
+            
+  //           // Extract overall behavior score
+  //           double behaviorScore = (data['overall_behavior_score'] ?? 0).toDouble();
+  //           score = behaviorScore.toInt();
+            
+  //           print('User Score: $score');
+            
+  //           // Extract breakdown metrics from your backend
+  //           breakdown = {
+  //             "Speed Consistency": _ratingLabel((data['speed_consistency_score'] ?? 0) / 100),
+  //             "Acceleration": _ratingLabel((data['avg_gentle_acceleration_score'] ?? 0) / 100),
+  //             "Turn Quality": _ratingLabel((data['avg_turn_speed_score'] ?? 0) / 100),
+  //             "Safe Turns": _ratingLabel((data['safe_turns_percentage'] ?? 0) / 100),
+  //           };
+            
+  //           // Extract trip scores for the graph
+  //           if (data['trips'] != null && data['trips'] is List) {
+  //             List<dynamic> tripsList = data['trips'];
+  //             scores = tripsList.map((trip) {
+  //               // Get behavior score from each trip
+  //               double tripScore = (trip['behavior_score'] ?? 0).toDouble();
+  //               return tripScore;
+  //             }).toList();
+              
+  //             // Also extract dates for the graph if needed
+  //             dates = tripsList.map((trip) {
+  //               // Format the date from timestamp
+  //               String timestamp = trip['start_timestamp'] ?? '';
+  //               return timestamp; // You may want to format this
+  //             }).toList();
+  //           }
+  //         });
+  //       }
+  //     } else {
+  //       print('Failed to load score: ${response.statusCode}');
+  //       print('Response: ${response.body}');
+  //       if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //     }
+  //   } catch (error) {
+  //     print('Error loading score: $error');
+  //     if (mounted) setState(() => isLoading = false);  // ADD mounted check
+  //   }
+  // }
+  // Revert to above function if below function causes issues
   Future<void> _loadUserInfo() async {
+    if (!mounted) return;
+    
     SharedPreferences prefs = await SharedPreferences.getInstance();
-
     role = prefs.getString('role')!;
-
-    final token = prefs.getString('access_token');
-
-    final responseScore = await http.get(
-      Uri.parse('$server/score'), 
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-
-    // TODO Replace breakdown with correct names in database
-    if (responseScore.statusCode == 200) {
-        final data = json.decode(responseScore.body);
+    
+    try {
+      Map<String, dynamic>? data = await DataManager.getDriverAnalytics();
+      
+      if (data != null && mounted) {
         setState(() {
           isLoading = false;
-
-            final rawScore = data['totalScore'] ?? 0.0;
-            final roundedScore = double.parse(rawScore.toStringAsFixed(2));
-
-            this.score = (roundedScore * 100).toInt();
-          print('User Score : ${score}');
+          
+          double behaviorScore = (data['overall_behavior_score'] ?? 0).toDouble();
+          score = behaviorScore.toInt();
+          
           breakdown = {
-            "Braking": _ratingLabel(data['braking']),
-            "Acceleration": _ratingLabel(data['acceleration']),
+            "Speed Consistency": _ratingLabel((data['speed_consistency_score'] ?? 0) / 100),
+            "Acceleration": _ratingLabel((data['avg_gentle_acceleration_score'] ?? 0) / 100),
+            "Turn Quality": _ratingLabel((data['avg_turn_speed_score'] ?? 0) / 100),
+            "Safe Turns": _ratingLabel((data['safe_turns_percentage'] ?? 0) / 100),
           };
+          
+          if (data['trips'] != null && data['trips'] is List) {
+            List<dynamic> tripsList = data['trips'];
+            scores = tripsList.map((trip) {
+              double tripScore = (trip['behavior_score'] ?? 0).toDouble();
+              return tripScore;
+            }).toList();
+          }
         });
       } else {
-        print('Failed to load score');
-        setState(() {
-          isLoading = false;
-        });
+        if (mounted) setState(() => isLoading = false);
       }
-
-
-    final responsePrevTrips = await http.get(
-        Uri.parse('$server/previoustrips'), 
-        headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-        }
-    );
-
-    if (responsePrevTrips.statusCode == 200) {
-        final data = json.decode(responsePrevTrips.body);
-        //TODO 
+    } catch (error) {
+      print('Error loading score: $error');
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
 
   // loads a users scores and corresponding dates of a trip for graph
   Future<void> loadTripData() async {
@@ -145,41 +271,47 @@ Widget build(BuildContext context) {
     ),
     // If user doesn't have a score (error) direct them to start a trip
     body: isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : score == 0
-            ? _buildNoTripsYet(context)
-            : SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Creates circle score with score percent in the middle
-                    CircularPercentIndicator(
-                      radius: screenHeight *.1, 
-                      lineWidth: 12.0,
-                      percent: score / 100,
-                      center: Text(
-                        "$score%",
-                        style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
-                      ),
-                      progressColor: scoreColor(score),
-                      backgroundColor: Colors.grey[300]!,
-                      circularStrokeCap: CircularStrokeCap.round,
-                      animation: true,
-                      animationDuration: 1000,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Your Current Score: $score%',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-                    ),
+      ? const Center(child: CircularProgressIndicator())
+      : SingleChildScrollView(  // Remove the score == 0 check
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Score display
+              if (score > 0) ...[
+                CircularPercentIndicator(
+                  radius: screenHeight * .1,
+                  lineWidth: 12.0,
+                  percent: score / 100,
+                  center: Text(
+                    "$score%",
+                    style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
+                  ),
+                  progressColor: scoreColor(score),
+                  backgroundColor: Colors.grey[300]!,
+                  circularStrokeCap: CircularStrokeCap.round,
+                  animation: true,
+                  animationDuration: 1000,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Your Current Score: $score%',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+                ),
+              ] else ...[
+                // Show loading or no data message
+                Text(
+                  'Loading score...',
+                  style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                ),
+              ],
                     const SizedBox(height: 30),
                     // Graph
-                    MiniScoreGraph(
-                      scores: convertScore(scores),   // Converts scores from 0-1 to 0-100 
-                      height: screenHeight *.22,      // makes heigh of graph dynamic to size of screen
-                      dates: dates
-                    ),
+                    // MiniScoreGraph(
+                    //   scores: convertScore(scores),   // Converts scores from 0-1 to 0-100 
+                    //   height: screenHeight *.22,      // makes heigh of graph dynamic to size of screen
+                    //   dates: dates
+                    // ),
                     const SizedBox(height: 30),
                     Container(
                       width: double.infinity,
@@ -320,7 +452,6 @@ void _showFullReportModal(BuildContext context) {
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text("Close"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade700,
                     foregroundColor: Colors.white,
@@ -329,6 +460,7 @@ void _showFullReportModal(BuildContext context) {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                  child: const Text("Close"),
                 ),
               ],
             ),
@@ -429,7 +561,7 @@ void _showFullReportModal(BuildContext context) {
       String? date = prevTrip['start_time'];
 
       // used for testing date and score
-      print(counter.toString() + ") score: " + score.toString() + "    date: " + date.toString());
+      print("$counter) score: $score    date: $date");
       
       // If score and date are not null, add them to list
       //
@@ -440,7 +572,7 @@ void _showFullReportModal(BuildContext context) {
         
     }
 
-    print("Dates and Scores: "+dateScoreList.toList().toString());
+    print("Dates and Scores: ${dateScoreList.toList()}");
 
     
     if (dateScoreList.isNotEmpty){
