@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
 import 'trip_helper.dart';
+import 'geocodingutils.dart';
+import 'dart:math';
 
 // AdminHomePage is the main dashboard for administrators, providing:
 // - System statistics overview
@@ -51,6 +53,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
   // Account Creation State - Manages form state for new account creation
   final _createAccountFormKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+    // Geocoding state for driver creation
+  bool _isGeocodingZipcode = false;
+  bool? _zipcodeValidAdmin;
+  CityCoordinates? _basePointAdmin;
   final _passwordController = TextEditingController();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -75,10 +81,70 @@ class _AdminHomePageState extends State<AdminHomePage> {
     // Load initial data when widget is created
     _fetchQuickStats();
     _fetchServerInfo();
+    // Add listener for zipcode geocoding when creating drivers
+    _adminIdController.addListener(_onAdminZipcodeChanged);
+  }
+
+  // Debounced zipcode geocoding for admin creating drivers
+  void _onAdminZipcodeChanged() {
+    if (_selectedRole != 'user') return;
+    
+    final zipcode = _adminIdController.text.trim();
+    
+    if (zipcode.isEmpty) {
+      setState(() {
+        _zipcodeValidAdmin = null;
+        _basePointAdmin = null;
+      });
+      return;
+    }
+    
+    final isValid = validateZipcode(zipcode);
+    setState(() {
+      _zipcodeValidAdmin = isValid;
+    });
+    
+    if (isValid && zipcode.length == 5) {
+      Future.delayed(Duration(milliseconds: 800), () {
+        if (_adminIdController.text.trim() == zipcode) {
+          _performAdminGeocoding(zipcode);
+        }
+      });
+    } else {
+      setState(() {
+        _basePointAdmin = null;
+      });
+    }
+  }
+
+  Future<void> _performAdminGeocoding(String zipcode) async {
+    if (_isGeocodingZipcode) return;
+    
+    setState(() {
+      _isGeocodingZipcode = true;
+    });
+    
+    try {
+      final coordinates = await getCityCoordinatesFromZipcode(zipcode);
+      setState(() {
+        _basePointAdmin = coordinates;
+      });
+      print('🎯 Admin: Base point set: ${coordinates.city}, ${coordinates.state}');
+    } catch (error) {
+      print('❌ Admin: Geocoding error: $error');
+      setState(() {
+        _basePointAdmin = null;
+      });
+    } finally {
+      setState(() {
+        _isGeocodingZipcode = false;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _adminIdController.removeListener(_onAdminZipcodeChanged);
     // Clean up all controllers to prevent memory leaks
     _emailController.dispose();
     _passwordController.dispose();
@@ -951,19 +1017,64 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     },
                   ),
                   SizedBox(height: 12),
-                  _buildFormField(
-                    controller: _adminIdController,  // Reuse this controller for zipcode
-                    label: 'Zipcode',
-                    icon: Icons.location_on,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter zipcode';
-                      }
-                      if (value.length != 5 || !RegExp(r'^\d+$').hasMatch(value)) {
-                        return 'Please enter a valid 5-digit zipcode';
-                      }
-                      return null;
-                    },
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFormField(
+                        controller: _adminIdController,  // Reuse this controller for zipcode
+                        label: 'Zipcode',
+                        icon: Icons.location_on,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter zipcode';
+                          }
+                          if (value.length != 5 || !RegExp(r'^\d+$').hasMatch(value)) {
+                            return 'Please enter a valid 5-digit zipcode';
+                          }
+                          if (_basePointAdmin == null && !_isGeocodingZipcode) {
+                            return 'Unable to verify zipcode';
+                          }
+                          return null;
+                        },
+                      ),
+                      // Show resolved location
+                      if (_basePointAdmin != null && _basePointAdmin!.source != 'fallback')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, size: 14, color: Colors.green),
+                              SizedBox(width: 6),
+                              Text(
+                                '📍 ${_basePointAdmin!.city}, ${_basePointAdmin!.state}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (_isGeocodingZipcode)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Verifying zipcode...',
+                                style: TextStyle(fontSize: 12, color: Colors.blue[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                 ],
 
@@ -2263,6 +2374,12 @@ class _AdminHomePageState extends State<AdminHomePage> {
         requestBody['role'] = 'driver';
         requestBody['name'] = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
         requestBody['zipcode'] = _adminIdController.text.trim(); // Using adminIdController for zipcode
+        
+        // Add base_point from geocoding
+        if (_basePointAdmin != null) {
+          requestBody['base_point'] = _basePointAdmin!.toJson();
+          print('📍 Admin: Including base_point: ${_basePointAdmin!.city}, ${_basePointAdmin!.state}');
+        }
       } else if (_selectedRole == 'insurance') {
         // Creating an insurance provider account
         requestBody['role'] = 'provider';

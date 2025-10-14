@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 import 'data_manager.dart'; // Add this import
 
+import 'dart:math';
 
 class UserHomePage extends StatefulWidget {
   final String firstName;
@@ -362,7 +363,30 @@ class _UserHomePageState extends State<UserHomePage> {
             // Start Trip Button
             Center(
               child: GestureDetector(
-                onTap: () {
+                onTap: () async {
+                  // Initialize trip state before navigating
+                  SharedPreferences prefs = await SharedPreferences.getInstance();
+                  String? userDataJson = prefs.getString('user_data');
+                  
+                  if (userDataJson != null) {
+                    Map<String, dynamic> userData = json.decode(userDataJson);
+                    String userId = userData['user_id'] ?? '';
+                    
+                    // Generate new trip ID
+                    int timestamp = DateTime.now().millisecondsSinceEpoch;
+                    int randomNum = Random().nextInt(999999);
+                    String tripId = 'trip_${userId}_${timestamp}_$randomNum';
+                    
+                    // Store trip info
+                    await prefs.setString('current_trip_id', tripId);
+                    await prefs.setString('trip_start_time', DateTime.now().toIso8601String());
+                    await prefs.setInt('batch_counter', 0);
+                    await prefs.setDouble('max_speed', 0.0);
+                    
+                    print('✅ New trip started: $tripId');
+                  }
+                  
+                  // Navigate to current trip page
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => CurrentTripPage()),

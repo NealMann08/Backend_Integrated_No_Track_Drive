@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'home_page.dart';
 import 'ipconfig.dart';
+import 'geocodingutils.dart';
 
 class LoginPageWidget extends StatefulWidget {
   const LoginPageWidget({super.key});
@@ -29,13 +30,17 @@ class _LoginPageWidgetState extends State<LoginPageWidget>
   bool _isProcessing = false;
   final String _selectedRole = 'user';
   bool _isSignupMode = false;
-  
+  // Geocoding state
+  bool _isGeocoding = false;
+  bool? _zipcodeValid;
+  CityCoordinates? _basePoint;
 
   // Controllers
   final emailController = TextEditingController();
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final passwordController = TextEditingController();
+  final zipcodeController = TextEditingController();
   final insuranceProviderController = TextEditingController();
   final stateController = TextEditingController();
   final serverNumberController = TextEditingController();
@@ -55,18 +60,82 @@ final _serverNumberController = TextEditingController();
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _initializePrefs();
+    
+    // Add listener for zipcode real-time geocoding
+    zipcodeController.addListener(_onZipcodeChanged);
   }
 
   Future<void> _initializePrefs() async {
     _prefs = await SharedPreferences.getInstance();
   }
 
+  // Debounced zipcode geocoding
+  void _onZipcodeChanged() {
+    if (!_isSignupMode || _selectedRole != 'user') return;
+    
+    final zipcode = zipcodeController.text.trim();
+    
+    if (zipcode.isEmpty) {
+      setState(() {
+        _zipcodeValid = null;
+        _basePoint = null;
+      });
+      return;
+    }
+    
+    final isValid = validateZipcode(zipcode);
+    setState(() {
+      _zipcodeValid = isValid;
+    });
+    
+    if (isValid && zipcode.length == 5) {
+      // Debounce geocoding call
+      Future.delayed(Duration(milliseconds: 800), () {
+        if (zipcodeController.text.trim() == zipcode) {
+          _performGeocoding(zipcode);
+        }
+      });
+    } else {
+      setState(() {
+        _basePoint = null;
+      });
+    }
+  }
+
+  // Perform geocoding
+  Future<void> _performGeocoding(String zipcode) async {
+    if (_isGeocoding) return;
+    
+    setState(() {
+      _isGeocoding = true;
+    });
+    
+    try {
+      final coordinates = await getCityCoordinatesFromZipcode(zipcode);
+      setState(() {
+        _basePoint = coordinates;
+      });
+      print('🎯 Base point set: ${coordinates.city}, ${coordinates.state}');
+    } catch (error) {
+      print('❌ Geocoding error: $error');
+      setState(() {
+        _basePoint = null;
+      });
+    } finally {
+      setState(() {
+        _isGeocoding = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    zipcodeController.removeListener(_onZipcodeChanged);
     emailController.dispose();
     firstNameController.dispose();
     lastNameController.dispose();
     passwordController.dispose();
+    zipcodeController.dispose();
     insuranceProviderController.dispose();
     stateController.dispose();
     serverNumberController.dispose();
@@ -128,7 +197,7 @@ final _serverNumberController = TextEditingController();
     }
     
     // Build data structure matching your backend
-    final data = {
+    final Map<String, dynamic> data = {
       'email': emailController.text.toLowerCase().trim(),
       'password': passwordController.text,
       'mode': 'signup',
@@ -141,7 +210,13 @@ final _serverNumberController = TextEditingController();
     // }
     if (_selectedRole == 'user') {
       data['name'] = '${firstNameController.text.trim()} ${lastNameController.text.trim()}';
-      data['zipcode'] = '00000'; // Default zipcode - you may want to add a field for this
+      data['zipcode'] = zipcodeController.text.trim();
+      
+      // Add base_point from geocoding
+      if (_basePoint != null) {
+        data['base_point'] = _basePoint!.toJson();
+        print('📍 Including base_point: ${_basePoint!.city}, ${_basePoint!.state}');
+      }
     } else if (_selectedRole == 'insurance') {
       data['name'] = insuranceProviderController.text.trim();
       // Store additional fields in metadata if needed
@@ -602,6 +677,8 @@ Widget _buildTabBar() {
           const SizedBox(height: 16),
           _buildTextField('Last Name', lastNameController, Icons.person),
           const SizedBox(height: 16),
+          _buildZipcodeField(),
+          const SizedBox(height: 16),
         ]);
       }
       fields.add(_buildTextField('Password', passwordController, Icons.lock));
@@ -671,6 +748,97 @@ Widget _buildTabBar() {
         }
         return null;
       },
+    );
+  }
+
+  Widget _buildZipcodeField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: zipcodeController,
+          keyboardType: TextInputType.number,
+          maxLength: 5,
+          style: TextStyle(color: black, fontSize: 16),
+          decoration: InputDecoration(
+            labelText: 'Zipcode',
+            labelStyle: TextStyle(color: grey),
+            prefixIcon: Icon(Icons.location_on, color: primaryBlue, size: 24),
+            suffixIcon: _isGeocoding
+                ? Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : _zipcodeValid == true && _basePoint != null
+                    ? Icon(Icons.check_circle, color: Colors.green)
+                    : _zipcodeValid == false
+                        ? Icon(Icons.error, color: Colors.red)
+                        : null,
+            filled: true,
+            fillColor: white,
+            counterText: '', // Hide the character counter
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: grey.withAlpha(75)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: grey.withAlpha(75)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: primaryBlue, width: 2),
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter your zipcode';
+            }
+            if (value.length != 5) {
+              return 'Zipcode must be 5 digits';
+            }
+            if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+              return 'Zipcode must contain only numbers';
+            }
+            if (_basePoint == null && !_isGeocoding) {
+              return 'Unable to verify zipcode';
+            }
+            return null;
+          },
+        ),
+        // Show resolved location
+        if (_basePoint != null && _basePoint!.source != 'fallback')
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+            child: Row(
+              children: [
+                Icon(Icons.check_circle, size: 16, color: Colors.green),
+                SizedBox(width: 6),
+                Text(
+                  '${_basePoint!.city}, ${_basePoint!.state}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.green[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (_isGeocoding)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+            child: Text(
+              'Verifying zipcode...',
+              style: TextStyle(fontSize: 12, color: Colors.blue[600]),
+            ),
+          ),
+      ],
     );
   }
 

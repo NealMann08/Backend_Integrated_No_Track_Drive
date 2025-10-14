@@ -242,8 +242,11 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         });
       });
 
-      _sendDataTimer = Timer.periodic(Duration(seconds: 30), (timer) {
-        sendTripData();
+      // Send data when we have 24-25 points (5 sec intervals = ~2 minutes)
+      _sendDataTimer = Timer.periodic(Duration(seconds: 120), (timer) {
+        if (deltaPoints.length >= 24) {
+          sendTripData();
+        }
       });
     } else {
       _showPermissionDialog(
@@ -287,23 +290,31 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     String? tripId = prefs.getString('current_trip_id');
     String? tripStartTime = prefs.getString('trip_start_time');
     String? userDataJson = prefs.getString('user_data');
-    
-    if (tripId != null && tripId.isNotEmpty && userDataJson != null) {
+
+    if (tripId != null && tripId.isNotEmpty && tripStartTime != null && userDataJson != null) {
       Map<String, dynamic> userData = json.decode(userDataJson);
       String userId = userData['user_id'] ?? '';
       
+      // Calculate trip duration
+      DateTime startTime = DateTime.parse(tripStartTime);
+      DateTime endTime = DateTime.now();
+      double durationMinutes = endTime.difference(startTime).inSeconds / 60.0;
+
       Map<String, dynamic> finalizeData = {
         'user_id': userId,
         'trip_id': tripId,
         'start_timestamp': tripStartTime,
-        'end_timestamp': DateTime.now().toIso8601String(),
+        'end_timestamp': endTime.toIso8601String(),
         'trip_quality': {
+          'use_gps_metrics': true,
+          'gps_max_speed_mph': maxSpeed,
+          'actual_duration_minutes': durationMinutes,
+          'actual_distance_miles': 0.0,
           'total_points': _pointCounter,
           'valid_points': _pointCounter,
           'rejected_points': 0,
           'average_accuracy': 5.0,
-          'actual_duration_minutes': _elapsedTime / 60,
-          'actual_distance_miles': 0, // Calculate if needed
+          'gps_quality_score': 0.9,
         }
       };
       
@@ -318,11 +329,22 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         );
         
         if (response.statusCode == 200) {
-          print('Trip finalized successfully');
-          // Clear trip data
-          await prefs.remove('current_trip_id');
-          await prefs.remove('trip_start_time');
-        }
+        print('✅ Trip finalized successfully');
+        // Clear trip data
+        await prefs.remove('current_trip_id');
+        await prefs.remove('trip_start_time');
+        await prefs.setInt('batch_counter', 0);
+        await prefs.setDouble('max_speed', 0.0);
+        
+        // Reset state
+        setState(() {
+          maxSpeed = 0.0;
+          currentSpeed = 0.0;
+          _pointCounter = 0;
+          deltaPoints.clear();
+          deltaPointsClone.clear();
+        });
+      }
       } catch (error) {
         print('Error finalizing trip: $error');
       }
@@ -467,13 +489,13 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       'deltas': deltaPoints.map((point) => {
         'delta_lat': point['dlat'],
         'delta_long': point['dlon'],
-        'delta_time': 5000, // 5 seconds between points
+        'delta_time': 5.0, // 5.0 seconds (float, not milliseconds)
         'timestamp': point['t'],
         'sequence': point['p'],
-        'speed_mph': 0, // You'll need to calculate this
+        'speed_mph': currentSpeed, // Use tracked current speed
         'speed_confidence': 0.8,
-        'gps_accuracy': 5,
-        'is_stationary': false,
+        'gps_accuracy': 5.0,
+        'is_stationary': currentSpeed < 1.0,
         'data_quality': 'high'
       }).toList(),
       'quality_metrics': {
