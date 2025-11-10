@@ -377,13 +377,41 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
 
                               const SizedBox(height: 16),
                               Expanded(
-                                child: ListView.separated(
-                                  itemCount: filteredTrips.length,
-                                  separatorBuilder:
-                                      (context, index) =>
-                                          const Divider(height: 1),
+                                child: RefreshIndicator(
+                                  onRefresh: () async {
+                                    await DataManager.getDriverAnalytics(forceRefresh: true);
+                                    await fetchPreviousTrips();
+                                  },
+                                  child: filteredTrips.isEmpty
+                                      ? ListView(
+                                          children: [
+                                            SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                                            Center(
+                                              child: Column(
+                                                children: [
+                                                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+                                                  SizedBox(height: 16),
+                                                  Text(
+                                                    'No trips found',
+                                                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                                                  ),
+                                                  SizedBox(height: 8),
+                                                  Text(
+                                                    'Pull down to refresh',
+                                                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        )
+                                      : ListView.separated(
+                                          itemCount: filteredTrips.length,
+                                          separatorBuilder:
+                                              (context, index) =>
+                                                  const Divider(height: 1),
 
-                                  itemBuilder: (context, index) {
+                                          itemBuilder: (context, index) {
                                     final trip = filteredTrips[index];
                                     
                                     // Parse date from your backend format
@@ -476,6 +504,7 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
                                       ),
                                     );
                                   },
+                                ),
                                 ),
                               ),
                             ],

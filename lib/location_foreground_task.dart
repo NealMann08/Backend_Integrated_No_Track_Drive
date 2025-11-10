@@ -9,6 +9,9 @@ import 'dart:isolate';
 
 
 class LocationTaskHandler extends TaskHandler {
+    Map<String, dynamic>? _basePoint;
+    DateTime? _lastPointTime;
+    double? _prevLatActual, _prevLonActual;  // For speed calculation
 
     Timer? _timer;
     int? _prevLat, _prevLon;
@@ -17,7 +20,21 @@ class LocationTaskHandler extends TaskHandler {
 
     @override
     Future<void> onStart(DateTime timestamp, TaskStarter task) async {
-        print("event in onstart");
+        print("Loading user base point for delta calculations...");
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? userDataJson = prefs.getString('user_data');
+        
+        if (userDataJson != null) {
+            Map<String, dynamic> userData = json.decode(userDataJson);
+            if (userData['base_point'] != null) {
+                _basePoint = userData['base_point'];
+                print("Base point loaded: ${_basePoint!['city']}, ${_basePoint!['state']}");
+                print("Base coordinates: ${_basePoint!['latitude']}, ${_basePoint!['longitude']}");
+            } else {
+                print("WARNING: No base point found in user data!");
+            }
+        }
+        _lastPointTime = DateTime.now();
     }
 
     @override 
@@ -26,33 +43,72 @@ class LocationTaskHandler extends TaskHandler {
     }
 
     @override
-        Future<void> onEvent(DateTime timestamp, SendPort? sendPort) async {
-            print("event triggered");
-            Position position = await Geolocator.getCurrentPosition(
-                    desiredAccuracy: LocationAccuracy.high);
-
-            int lat = (position.latitude * 1000000).toInt();
-            int lon = (position.longitude * 1000000).toInt();
-
-            if (_prevLat != null && _prevLon != null) {
-                _deltaPoints.insert(0, {
-                        'dlat': lat - _prevLat!,
-                        'dlon': lon - _prevLon!,
-                        't': DateTime.now().toIso8601String(),
-                        'p': _counter++,
-                        });
-
-                // Send to server every 30 seconds
-                if (_deltaPoints.length >= 24) {
-                    print("sending data to server");
-                    await _sendToServer();
-                    _deltaPoints.clear();
-                }
-            }
-
-            _prevLat = lat;
-            _prevLon = lon;
+    Future<void> onEvent(DateTime timestamp, SendPort? sendPort) async {
+        print("Location event triggered");
+        
+        if (_basePoint == null) {
+            print("ERROR: No base point available, cannot calculate deltas!");
+            return;
         }
+        
+        Position position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high);
+        
+        DateTime now = DateTime.now();
+        
+        // Calculate time difference in milliseconds
+        int deltaTimeMs = _lastPointTime != null ? 
+            now.difference(_lastPointTime!).inMilliseconds : 1000;
+        
+        // Get base point coordinates
+        double baseLat = (_basePoint!['latitude'] ?? 0.0).toDouble();
+        double baseLon = (_basePoint!['longitude'] ?? 0.0).toDouble();
+        
+        // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point)
+        int deltaLat = ((position.latitude - baseLat) * 1000000).round();
+        int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+        
+        // Calculate speed
+        double speedMph = 0.0;
+        if (position.speed != null && position.speed! >= 0) {
+            speedMph = position.speed! * 2.237; // Convert m/s to mph
+        } else if (_prevLatActual != null && _prevLonActual != null) {
+            double distance = Geolocator.distanceBetween(
+                _prevLatActual!, _prevLonActual!,
+                position.latitude, position.longitude
+            ) * 0.000621371; // meters to miles
+            double timeHours = deltaTimeMs / 3600000.0; // ms to hours
+            if (timeHours > 0) speedMph = distance / timeHours;
+        }
+        
+        _deltaPoints.insert(0, {
+            'dlat': deltaLat,
+            'dlon': deltaLon,
+            'dt': deltaTimeMs,
+            't': now.toIso8601String(),
+            'p': _counter++,
+            'speed_mph': speedMph,
+            'gps_speed': position.speed,
+            'accuracy': position.accuracy,
+        });
+        // Update point counter in SharedPreferences for UI
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('point_counter', _counter);
+        await prefs.setDouble('current_speed', speedMph);
+        print("Delta calculated - Lat: $deltaLat, Lon: $deltaLon, Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)}mph");
+        
+        // Store for next calculation
+        _prevLatActual = position.latitude;
+        _prevLonActual = position.longitude;
+        _lastPointTime = now;
+        
+        // Send batch when we have 25 points
+        if (_deltaPoints.length >= 25) {
+            print("Batch ready - sending ${_deltaPoints.length} points to server");
+            await _sendToServer();
+            _deltaPoints.clear();
+        }
+    }
 
     Future<void> _sendToServer() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -78,21 +134,25 @@ class LocationTaskHandler extends TaskHandler {
     batchNumber++;
     await prefs.setInt('batch_counter', batchNumber);
     
-    // Transform delta points to match your backend format
-    List<Map<String, dynamic>> deltas = _deltaPoints.map((point) {
-      return {
-        'delta_lat': point['dlat'],
-        'delta_long': point['dlon'],
-        'delta_time': 5.0, // 5.0 seconds (float)
+    // Transform delta points to match backend format
+    List<Map<String, dynamic>> deltas = [];
+    for (int i = 0; i < _deltaPoints.length; i++) {
+      var point = _deltaPoints[i];
+      
+      deltas.add({
+        'delta_lat': point['dlat'],        // Already in fixed-point integer
+        'delta_long': point['dlon'],       // Already in fixed-point integer
+        'delta_time': point['dt'].toDouble(), // Convert to double for backend
         'timestamp': point['t'],
         'sequence': point['p'],
-        'speed_mph': 0.0, // Background doesn't have speed tracking
-        'speed_confidence': 0.5,
-        'gps_accuracy': 5.0,
-        'is_stationary': false,
-        'data_quality': 'medium'
-      };
-    }).toList();
+        'speed_mph': point['speed_mph'],
+        'speed_confidence': point['gps_speed'] != null ? 0.9 : 0.6,
+        'gps_accuracy': point['accuracy'] ?? 5.0,
+        'is_stationary': point['speed_mph'] < 2.0,
+        'data_quality': 'high',
+        'raw_speed_ms': point['gps_speed']
+      });
+    }
     
     // Prepare batch data matching your backend format
     Map<String, dynamic> data = {

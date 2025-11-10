@@ -8,6 +8,22 @@ import 'home_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'location_foreground_task.dart';
+import 'dart:io'; // Add this import at the top
+
+// Add this method in the CurrentTripPageState class
+Future<bool> _checkNetworkConnection() async {
+  try {
+    final result = await InternetAddress.lookup('google.com');
+    if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+      return true;
+    }
+  } on SocketException catch (_) {
+    return false;
+  }
+  return false;
+}
 
 class CurrentTripPage extends StatefulWidget {
   const CurrentTripPage({super.key});
@@ -19,16 +35,11 @@ class CurrentTripPage extends StatefulWidget {
 class CurrentTripPageState extends State<CurrentTripPage> {
   bool isTripStarted = false;
   bool isLoading = true;
-  Timer? _deltaTimer;
   Timer? _elapsedTimeTimer;
-  Timer? _sendDataTimer;
+  Timer? _speedUpdateTimer;
   DateTime? tripStartTime;
   int _elapsedTime = 0;
-  int? _previousMaskedLatitude, _previousMaskedLongitude;
-  List<Map<String, dynamic>> deltaPoints = [];
-  List<Map<String, dynamic>> deltaPointsClone = [];
   int _pointCounter = 0;
-  int? _firstMaskedLatitude, _firstMaskedLongitude;
   final String server = AppConfig.server;
   Random rand = Random();
   late String role;
@@ -40,13 +51,6 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   double maxSpeed = 0.0;
   Position? lastPosition;
 
-  Future<void> _loadFirstPoint() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _firstMaskedLatitude = prefs.getInt('first_latitude');
-      _firstMaskedLongitude = prefs.getInt('first_longitude');
-    });
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -54,25 +58,13 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     });
   }
 
-  Future<void> _storeFirstPoint(int maskedLatitude, int maskedLongitude) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('first_latitude', maskedLatitude);
-    await prefs.setInt('first_longitude', maskedLongitude);
-    setState(() {
-      _firstMaskedLatitude = maskedLatitude;
-      _firstMaskedLongitude = maskedLongitude;
-    });
-  }
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _requestPermissions();
-    _loadFirstPoint().then((_) {
-      Geolocator.getCurrentPosition();
-      setState(() {});
-    });
+    _initForegroundTask();
   }
 
   Future<void> _loadUserInfo() async {
@@ -84,13 +76,33 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     });
   }
 
+  void _initForegroundTask() {
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'location_tracking',
+        channelName: 'Location Tracking',
+        channelDescription: 'Tracking your trip location',
+        channelImportance: NotificationChannelImportance.LOW,
+        priority: NotificationPriority.LOW,
+        // Icon is set in Android manifest, not here
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: true,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(5000), // Repeat every 5 seconds
+        autoRunOnBoot: false,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+  }
+
   @override
   void dispose() {
-    // Only stop timers but do NOT clear delta points or reset UI
-    _deltaTimer?.cancel();
     _elapsedTimeTimer?.cancel();
-    _sendDataTimer?.cancel();
-
+    _speedUpdateTimer?.cancel();
     super.dispose();
   }
 
@@ -196,63 +208,107 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      await _requestPermissions(); // Request permission if not granted
+      await _requestPermissions();
       permission = await Geolocator.checkPermission();
     }
 
     if (permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse) {
+      
+      // Verify base point exists
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? userDataJson = prefs.getString('user_data');
+      if (userDataJson != null) {
+        Map<String, dynamic> userData = json.decode(userDataJson);
+        if (userData['base_point'] == null) {
+          _showErrorDialog(
+            'Setup Required',
+            'You need to set up your base location (zipcode) in your profile before starting a trip. This is required for privacy protection.',
+          );
+          return;
+        }
+      }
+      
       setState(() {
         isTripStarted = true;
-        deltaPoints.clear();
-        deltaPointsClone.clear();
         _elapsedTime = 0;
         _pointCounter = 0;
         tripStartTime = DateTime.now();
+        currentSpeed = 0.0;
+        maxSpeed = 0.0;
       });
 
-      await _showLoadingDialog("Getting ready... warming up GPS");
-
-      // wakes up GPS
-      debugPrint("Waking up GPS...");
-      await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.low,
+      // Start the foreground service
+      ServiceRequestResult result = await FlutterForegroundTask.startService(
+        notificationTitle: 'Trip in Progress',
+        notificationText: 'Tracking your location',
+        callback: startCallback,
       );
 
-      // let GPS stabilize
-      await Future.delayed(Duration(seconds: 3));
-
-      debugPrint("Getting accurate location...");
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-      debugPrint("Accurate: ${pos.latitude}, ${pos.longitude}");
-
-      debugPrint("GPS warmup complete. Starting timers.");
-      Navigator.of(context, rootNavigator: true).pop();
-
-      // Start listening to GPS updates
-      _deltaTimer = Timer.periodic(Duration(seconds: 5), (timer) {
-        _getCurrentLocation();
-      });
-
-      _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-        setState(() {
-          _elapsedTime++;
+      // Check if service started successfully by verifying if it's running
+      print('Service start result: $result');
+      
+      if (await FlutterForegroundTask.isRunningService) {
+        print('✅ Background location tracking started');
+        
+        // Timer to update elapsed time
+        _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+          setState(() {
+            _elapsedTime++;
+          });
         });
-      });
 
-      // Send data when we have 24-25 points (5 sec intervals = ~2 minutes)
-      _sendDataTimer = Timer.periodic(Duration(seconds: 120), (timer) {
-        if (deltaPoints.length >= 24) {
-          sendTripData();
-        }
-      });
+        // Timer to read speed data from background service
+        _speedUpdateTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          
+          // Update max speed
+          double? storedMaxSpeed = prefs.getDouble('max_speed');
+          if (storedMaxSpeed != null && storedMaxSpeed > maxSpeed) {
+            setState(() {
+              maxSpeed = storedMaxSpeed;
+            });
+          }
+          
+          // Update current speed from background service
+          double? storedCurrentSpeed = prefs.getDouble('current_speed');
+          if (storedCurrentSpeed != null) {
+            setState(() {
+              currentSpeed = storedCurrentSpeed;
+            });
+          }
+          
+          // Update point counter from background service
+          int? storedPointCounter = prefs.getInt('point_counter');
+          if (storedPointCounter != null) {
+            setState(() {
+              _pointCounter = storedPointCounter;
+            });
+          }
+        });
+      } else {
+        print('❌ Background tracking service not running');
+        setState(() {
+          isTripStarted = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start location tracking. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } else {
       _showPermissionDialog(
         "Location permission is required to start the trip.",
       );
     }
+  }
+
+  @pragma('vm:entry-point')
+  void startCallback() {
+    FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
   }
 
   // Stop the trip but KEEP delta points visible
@@ -280,12 +336,28 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       isTripStarted = false;
     });
 
-    // Send remaining data
-    if (deltaPoints.isNotEmpty) {
-      await sendTripData();
+    // Stop the foreground service
+    await FlutterForegroundTask.stopService();
+    print('✅ Background location tracking stopped');
+
+    // Check network connection
+    bool hasNetwork = await _checkNetworkConnection();
+    if (!hasNetwork) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No internet connection. Trip data saved locally.'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 5),
+        ),
+      );
+      // Stop timers but keep trip data
+      _elapsedTimeTimer?.cancel();
+      _speedUpdateTimer?.cancel();
+      setState(() {});
+      return;
     }
 
-    // Finalize trip with your backend
+    // Finalize trip with backend
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? tripId = prefs.getString('current_trip_id');
     String? tripStartTime = prefs.getString('trip_start_time');
@@ -295,7 +367,6 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       Map<String, dynamic> userData = json.decode(userDataJson);
       String userId = userData['user_id'] ?? '';
       
-      // Calculate trip duration
       DateTime startTime = DateTime.parse(tripStartTime);
       DateTime endTime = DateTime.now();
       double durationMinutes = endTime.difference(startTime).inSeconds / 60.0;
@@ -319,113 +390,115 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       };
       
       try {
-        final response = await http.post(
-          Uri.parse(finalizeEndpoint),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${prefs.getString('access_token')}',
-          },
-          body: json.encode(finalizeData),
+      // Try to finalize trip with retry logic
+      bool finalized = false;
+      int retries = 0;
+      const maxRetries = 3;
+      
+      while (!finalized && retries < maxRetries) {
+        try {
+          final response = await http.post(
+            Uri.parse(finalizeEndpoint),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ${prefs.getString('access_token')}',
+            },
+            body: json.encode(finalizeData),
+          ).timeout(Duration(seconds: 10));
+          
+          if (response.statusCode == 200) {
+            finalized = true;
+            print('✅ Trip finalized successfully');
+            
+            // Clear trip data
+            await prefs.remove('current_trip_id');
+            await prefs.remove('trip_start_time');
+            await prefs.setInt('batch_counter', 0);
+            await prefs.setDouble('max_speed', 0.0);
+            await prefs.setInt('point_counter', 0);
+            await prefs.setDouble('current_speed', 0.0);
+            
+            // Reset UI state
+            setState(() {
+              maxSpeed = 0.0;
+              currentSpeed = 0.0;
+              _pointCounter = 0;
+              _elapsedTime = 0;
+            });
+            
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Trip saved successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            print('❌ Finalization failed with status: ${response.statusCode}');
+            retries++;
+            if (retries < maxRetries) {
+              await Future.delayed(Duration(seconds: 2)); // Wait before retry
+            }
+          }
+        } catch (e) {
+          print('❌ Finalization attempt ${retries + 1} failed: $e');
+          retries++;
+          if (retries < maxRetries) {
+            await Future.delayed(Duration(seconds: 2)); // Wait before retry
+          }
+        }
+      }
+      
+      if (!finalized) {
+        // All retries failed - keep trip data for manual retry later
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save trip after $maxRetries attempts. Trip data preserved.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
         );
-        
-        if (response.statusCode == 200) {
-        print('✅ Trip finalized successfully');
-        // Clear trip data
-        await prefs.remove('current_trip_id');
-        await prefs.remove('trip_start_time');
-        await prefs.setInt('batch_counter', 0);
-        await prefs.setDouble('max_speed', 0.0);
-        
-        // Reset state
-        setState(() {
-          maxSpeed = 0.0;
-          currentSpeed = 0.0;
-          _pointCounter = 0;
-          deltaPoints.clear();
-          deltaPointsClone.clear();
-        });
       }
-      } catch (error) {
-        print('Error finalizing trip: $error');
-      }
+    } catch (error) {
+      print('❌ Error finalizing trip: $error');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving trip. Trip data preserved for retry.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
     }
 
     // Stop timers
-    _deltaTimer?.cancel();
     _elapsedTimeTimer?.cancel();
-    _sendDataTimer?.cancel();
+    _speedUpdateTimer?.cancel();
     
     setState(() {});
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      // Calculate speed
-      if (lastPosition != null) {
-        double distance = Geolocator.distanceBetween(
-          lastPosition!.latitude,
-          lastPosition!.longitude,
-          position.latitude,
-          position.longitude,
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red),
+              SizedBox(width: 8),
+              Text(title),
+            ],
+          ),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
         );
-        double timeInSeconds = 5.0; // Since we poll every 5 seconds
-        double speedMps = distance / timeInSeconds;
-        double speedMph = speedMps * 2.237; // Convert m/s to mph
-        
-        setState(() {
-          currentSpeed = speedMph;
-          if (speedMph > maxSpeed) {
-            maxSpeed = speedMph;
-          }
-        });
-      }
-      
-      lastPosition = position;
-
-
-      int maskedLatitude = (position.latitude * 1000000).toInt();
-      int maskedLongitude = (position.longitude * 1000000).toInt();
-
-      if (_firstMaskedLatitude == null || _firstMaskedLongitude == null) {
-        _storeFirstPoint(maskedLatitude, maskedLongitude);
-        _firstMaskedLatitude = maskedLatitude;
-        _firstMaskedLongitude = maskedLongitude;
-        _previousMaskedLatitude = maskedLatitude;
-        _previousMaskedLongitude = maskedLongitude;
-        return;
-      }
-
-      if (_previousMaskedLatitude != null && _previousMaskedLongitude != null) {
-        int deltaLat = maskedLatitude - _previousMaskedLatitude!;
-        int deltaLon = maskedLongitude - _previousMaskedLongitude!;
-
-        setState(() {
-          deltaPoints.insert(0, {
-            'dlat': deltaLat,
-            'dlon': deltaLon,
-            't': DateTime.now().toIso8601String(),
-            'p': _pointCounter,
-          });
-
-          deltaPointsClone.insert(0, {
-            'delta_latitude': deltaLat,
-            'delta_longitude': deltaLon,
-            'point_number': _pointCounter,
-          });
-
-          _pointCounter++;
-        });
-      }
-
-      _previousMaskedLatitude = maskedLatitude;
-      _previousMaskedLongitude = maskedLongitude;
-    } catch (e) {
-      print("Error getting location: $e");
-    }
+      },
+    );
   }
 
   // Future<void> sendTripData() async {
@@ -461,72 +534,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   //   }
   // }
   // IF below function causes issues revert to above sendTripData function
-  Future<void> sendTripData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('access_token');
-    String? userDataJson = prefs.getString('user_data');
-    
-    if (userDataJson == null) return;
-    Map<String, dynamic> userData = json.decode(userDataJson);
-    String userId = userData['user_id'] ?? '';
-    
-    // Generate trip ID if not exists
-    String tripId = prefs.getString('current_trip_id') ?? '';
-    if (tripId.isEmpty) {
-      tripId = 'trip_${userId}_${DateTime.now().millisecondsSinceEpoch}_${rand.nextInt(999999)}';
-      await prefs.setString('current_trip_id', tripId);
-      await prefs.setString('trip_start_time', DateTime.now().toIso8601String());
-    }
-    
-    // Prepare batch data matching your backend format
-    Map<String, dynamic> data = {
-      'user_id': userId,
-      'trip_id': tripId,
-      'batch_number': _pointCounter ~/ 25,
-      'batch_size': deltaPoints.length,
-      'first_point_timestamp': deltaPoints.isNotEmpty ? deltaPoints.last['t'] : DateTime.now().toIso8601String(),
-      'last_point_timestamp': deltaPoints.isNotEmpty ? deltaPoints.first['t'] : DateTime.now().toIso8601String(),
-      'deltas': deltaPoints.map((point) => {
-        'delta_lat': point['dlat'],
-        'delta_long': point['dlon'],
-        'delta_time': 5.0, // 5.0 seconds (float, not milliseconds)
-        'timestamp': point['t'],
-        'sequence': point['p'],
-        'speed_mph': currentSpeed, // Use tracked current speed
-        'speed_confidence': 0.8,
-        'gps_accuracy': 5.0,
-        'is_stationary': currentSpeed < 1.0,
-        'data_quality': 'high'
-      }).toList(),
-      'quality_metrics': {
-        'valid_points': deltaPoints.length,
-        'rejected_points': 0,
-        'average_accuracy': 5.0,
-        'speed_data_quality': 0.8,
-        'gps_quality_score': 0.9
-      }
-    };
-
-    try {
-      final response = await http.post(
-        Uri.parse(trajectoryEndpoint),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: json.encode(data),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 202) {
-        deltaPoints.clear();
-        print('Batch uploaded successfully');
-      } else {
-        print('Error sending trip data: ${response.body}');
-      }
-    } catch (error) {
-      print('Error: $error');
-    }
-  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -562,6 +570,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                       SizedBox(height: screenHeight * 0.02),
                       _buildTimerCard(screenWidth),
                       SizedBox(height: screenHeight * 0.02),
+                      if (isTripStarted) _buildTripStats(screenWidth),
+                      if (isTripStarted) SizedBox(height: screenHeight * 0.02),
                       _buildMapView(screenHeight, screenWidth),
                       SizedBox(height: screenHeight * 0.01),
                       _buildDeltaList(screenHeight, screenWidth),
@@ -657,11 +667,11 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         child: Padding(
           padding: EdgeInsets.all(screenWidth * 0.02),
           child:
-              deltaPointsClone.isNotEmpty
-                  ? ListView.builder(
-                    itemCount: deltaPointsClone.length,
+              false // Temporarily disabled  
+                ? ListView.builder(
+                    itemCount: 0,
                     itemBuilder: (context, index) {
-                      var delta = deltaPointsClone[index];
+                      var delta = {};
                       return ListTile(
                         leading: Icon(
                           Icons.location_on,
@@ -728,7 +738,72 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   //     ),
   //   );
   // }
-  // revert to above function if below causes issues
+
+
+  Widget _buildTripStats(double screenWidth) {
+    return Container(
+      padding: EdgeInsets.all(screenWidth * 0.04),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(screenWidth * 0.03),
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: screenWidth * 0.015),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatColumn(
+            Icons.timer,
+            'Duration',
+            formatElapsedTime(),
+            Colors.blue,
+          ),
+          _buildStatColumn(
+            Icons.speed,
+            'Current',
+            '${currentSpeed.toStringAsFixed(1)} mph',
+            Colors.green,
+          ),
+          _buildStatColumn(
+            Icons.trending_up,
+            'Max Speed',
+            '${maxSpeed.toStringAsFixed(1)} mph',
+            Colors.red,
+          ),
+          _buildStatColumn(
+            Icons.location_on,
+            'Points',
+            '$_pointCounter',
+            Colors.orange,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatColumn(IconData icon, String label, String value, Color color) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+        ),
+        SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMapView(double screenHeight, double screenWidth) {
     return Container(
       height: screenHeight * 0.25,
@@ -768,9 +843,10 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             SizedBox(height: 8),
             // Map visualization
             Expanded(
-              child: deltaPointsClone.isNotEmpty
-                  ? CustomPaint(
-                      painter: RoutePainter(deltaPointsClone),
+              // Temporarily disabled
+              child: false 
+                ? CustomPaint(
+                    painter: RoutePainter([]),
                       child: Container(),
                     )
                   : Center(

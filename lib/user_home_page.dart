@@ -39,6 +39,7 @@ class _UserHomePageState extends State<UserHomePage> {
   void initState() {
     super.initState();
     _loadRecentTrips();
+    _checkForActiveTrip();
   }
 
   // Future<void> _loadRecentTrips() async {
@@ -190,6 +191,65 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
+  Future<void> _checkForActiveTrip() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? activeTripId = prefs.getString('current_trip_id');
+    String? tripStartTime = prefs.getString('trip_start_time');
+    
+    if (activeTripId != null && activeTripId.isNotEmpty && tripStartTime != null) {
+      // There's an active trip - check if it's been more than 4 hours (likely abandoned)
+      DateTime startTime = DateTime.parse(tripStartTime);
+      Duration timeSinceStart = DateTime.now().difference(startTime);
+      
+      if (timeSinceStart.inHours > 4) {
+        // Trip likely abandoned - show dialog
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text('Active Trip Found'),
+                content: Text(
+                  'You have an active trip from ${timeSinceStart.inHours} hours ago. '
+                  'Would you like to abandon it or continue?'
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () async {
+                      // Abandon trip - clear data
+                      await prefs.remove('current_trip_id');
+                      await prefs.remove('trip_start_time');
+                      await prefs.setInt('batch_counter', 0);
+                      await prefs.setDouble('max_speed', 0.0);
+                      await prefs.setInt('point_counter', 0);
+                      Navigator.of(context).pop();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Previous trip abandoned')),
+                      );
+                    },
+                    child: Text('Abandon Trip'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // Navigate to current trip page to resume
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => CurrentTripPage()),
+                      );
+                    },
+                    child: Text('Continue Trip'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      }
+    }
+  }
+
 
   Widget _buildPreviousTripsSection() {
     return Card(
@@ -212,15 +272,47 @@ class _UserHomePageState extends State<UserHomePage> {
             ),
             SizedBox(height: 10),
             isLoading
-                ? Center(child: CircularProgressIndicator())
-                : errorMessage.isNotEmpty
-                    ? Center(
-                        child: Text(
-                          errorMessage,
-                          style: TextStyle(color: Colors.red, fontSize: 18),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text(
+                          'Loading trips...',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
                         ),
-                      )
-                    : recentTrips.isEmpty
+                      ],
+                    ),
+                  ),
+                )
+              : errorMessage.isNotEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 48, color: Colors.white70),
+                          SizedBox(height: 12),
+                          Text(
+                            errorMessage,
+                            style: TextStyle(color: Colors.white, fontSize: 16),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadRecentTrips,
+                            child: Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.blue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : recentTrips.isEmpty
                         ? Center(
                             child: Text(
                               'No recent trips available.',
@@ -370,6 +462,19 @@ class _UserHomePageState extends State<UserHomePage> {
                   
                   if (userDataJson != null) {
                     Map<String, dynamic> userData = json.decode(userDataJson);
+                    
+                    // ✅ VERIFY BASE POINT EXISTS
+                    if (userData['base_point'] == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: Base point not set. Please update your profile with a zipcode.'),
+                          backgroundColor: Colors.red,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                      return; // Don't start trip without base point
+                    }
+                    
                     String userId = userData['user_id'] ?? '';
                     
                     // Generate new trip ID
@@ -384,13 +489,21 @@ class _UserHomePageState extends State<UserHomePage> {
                     await prefs.setDouble('max_speed', 0.0);
                     
                     print('✅ New trip started: $tripId');
+                    print('Base point: ${userData['base_point']['city']}, ${userData['base_point']['state']}');
+                    
+                    // Navigate to current trip page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => CurrentTripPage()),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: User data not found. Please log in again.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
                   }
-                  
-                  // Navigate to current trip page
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => CurrentTripPage()),
-                  );
                 },
                 child: Container(
                   width: 200,

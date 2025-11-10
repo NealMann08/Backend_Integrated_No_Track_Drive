@@ -272,9 +272,15 @@ Widget build(BuildContext context) {
     // If user doesn't have a score (error) direct them to start a trip
     body: isLoading
       ? const Center(child: CircularProgressIndicator())
-      : SingleChildScrollView(  // Remove the score == 0 check
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-          child: Column(
+      : RefreshIndicator(
+          onRefresh: () async {
+            await DataManager.getDriverAnalytics(forceRefresh: true);
+            await _loadUserInfo();
+            await loadTripData();
+          },
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Score display
@@ -383,9 +389,10 @@ Widget build(BuildContext context) {
                         ],
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
+            ),
+          ),  // Add this closing parenthesis for RefreshIndicator
     bottomNavigationBar: isLoading
         ? null
         // Creates bottom nav bar (role dependent)

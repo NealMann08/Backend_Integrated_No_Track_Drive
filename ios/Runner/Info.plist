@@ -49,5 +49,27 @@
 	<string>We need access to your gallery to set your profile picture.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>We need access to your camera to take a profile picture.</string>
+	
+	<!-- Location permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to track your driving trips and generate safety scores.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need continuous access to your location to track trips even when the app is in the background or phone is locked.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need continuous access to your location to track trips even when the app is in the background or phone is locked.</string>
+	
+	<!-- Background modes -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	
+	<!-- Background task identifier -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.pravera.flutter_foreground_task</string>
+	</array>
 </dict>
 </plist>
