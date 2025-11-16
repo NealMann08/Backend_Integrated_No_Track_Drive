@@ -1,3 +1,4 @@
+import 'dart:io'; // Add this import at the top
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
@@ -10,7 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'location_foreground_task.dart';
-import 'dart:io'; // Add this import at the top
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 
 // Add this method in the CurrentTripPageState class
 Future<bool> _checkNetworkConnection() async {
@@ -91,7 +93,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(5000), // Repeat every 5 seconds
+        eventAction: ForegroundTaskEventAction.repeat(2000), // Repeat every 2 seconds
         autoRunOnBoot: false,
         allowWakeLock: true,
         allowWifiLock: true,
@@ -205,6 +207,17 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   }
 
   Future<void> startTrip() async {
+    // Check network first
+    bool hasNetwork = await _checkNetworkConnection();
+    if (!hasNetwork) {
+      _showErrorDialog(
+        'No Internet Connection',
+        'An internet connection is required to start tracking. Please check your connection and try again.',
+      );
+      return;
+    }
+    
+    // Check location permissions
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -218,16 +231,28 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       // Verify base point exists
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? userDataJson = prefs.getString('user_data');
-      if (userDataJson != null) {
-        Map<String, dynamic> userData = json.decode(userDataJson);
-        if (userData['base_point'] == null) {
-          _showErrorDialog(
-            'Setup Required',
-            'You need to set up your base location (zipcode) in your profile before starting a trip. This is required for privacy protection.',
-          );
-          return;
-        }
+      if (userDataJson == null) {
+        _showErrorDialog('Error', 'User data not found. Please log in again.');
+        return;
       }
+      
+      Map<String, dynamic> userData = json.decode(userDataJson);
+      if (userData['base_point'] == null) {
+        _showErrorDialog(
+          'Setup Required',
+          'You need to set up your base location (zipcode) in your profile before starting a trip. This is required for privacy protection.',
+        );
+        return;
+      }
+      
+      // Create trip ID for this session
+      String userId = userData['user_id'] ?? '';
+      if (userId.isEmpty) {
+        _showErrorDialog('Error', 'User ID not found. Please log in again.');
+        return;
+      }
+      
+      String tripId = 'trip_${userId}_${DateTime.now().millisecondsSinceEpoch}';
       
       setState(() {
         isTripStarted = true;
@@ -237,71 +262,158 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         currentSpeed = 0.0;
         maxSpeed = 0.0;
       });
-
-      // Start the foreground service
-      ServiceRequestResult result = await FlutterForegroundTask.startService(
-        notificationTitle: 'Trip in Progress',
-        notificationText: 'Tracking your location',
-        callback: startCallback,
-      );
-
-      // Check if service started successfully by verifying if it's running
-      print('Service start result: $result');
       
-      if (await FlutterForegroundTask.isRunningService) {
-        print('✅ Background location tracking started');
-        
-        // Timer to update elapsed time
-        _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      // Save trip metadata to SharedPreferences
+      await prefs.setString('current_trip_id', tripId);
+      await prefs.setString('trip_start_time', tripStartTime!.toIso8601String());
+      await prefs.setInt('batch_counter', 0);
+      await prefs.setDouble('max_speed', 0.0);
+      await prefs.setInt('point_counter', 0);
+      await prefs.setDouble('current_speed', 0.0);
+      
+      print('✅ Created trip: $tripId');
+      
+      // Timer to update elapsed time (works on all platforms)
+      _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+        if (mounted) {
           setState(() {
             _elapsedTime++;
           });
-        });
-
-        // Timer to read speed data from background service
+        }
+      });
+      
+      // Platform-specific tracking
+      if (kIsWeb) {
+        // WEB PLATFORM: Use timer-based location polling
+        print('🌐 Web platform detected - using timer-based tracking');
+        
+        // Start a timer to collect location data every 2 seconds
         _speedUpdateTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
-          SharedPreferences prefs = await SharedPreferences.getInstance();
-          
-          // Update max speed
-          double? storedMaxSpeed = prefs.getDouble('max_speed');
-          if (storedMaxSpeed != null && storedMaxSpeed > maxSpeed) {
-            setState(() {
-              maxSpeed = storedMaxSpeed;
-            });
+          if (!isTripStarted || !mounted) {
+            timer.cancel();
+            return;
           }
           
-          // Update current speed from background service
-          double? storedCurrentSpeed = prefs.getDouble('current_speed');
-          if (storedCurrentSpeed != null) {
+          try {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            ).timeout(Duration(seconds: 5));
+            
+            // Calculate speed
+            double speedMph = 0.0;
+            if (position.speed != null && position.speed! >= 0) {
+              speedMph = position.speed! * 2.237; // Convert m/s to mph
+            } else if (lastPosition != null) {
+              double distance = Geolocator.distanceBetween(
+                lastPosition!.latitude,
+                lastPosition!.longitude,
+                position.latitude,
+                position.longitude,
+              ) * 0.000621371; // meters to miles
+              double timeHours = 2.0 / 3600.0; // 2 seconds in hours
+              speedMph = distance / timeHours;
+            }
+            
             setState(() {
-              currentSpeed = storedCurrentSpeed;
+              currentSpeed = speedMph;
+              if (speedMph > maxSpeed) {
+                maxSpeed = speedMph;
+              }
+              _pointCounter++;
             });
+            
+            lastPosition = position;
+            
+            // Store in SharedPreferences for consistency
+            await prefs.setDouble('current_speed', speedMph);
+            await prefs.setDouble('max_speed', maxSpeed);
+            await prefs.setInt('point_counter', _pointCounter);
+            
+            print('📍 Web tracking - Speed: ${speedMph.toStringAsFixed(1)} mph, Points: $_pointCounter');
+            
+          } catch (e) {
+            print('❌ Error getting location on web: $e');
           }
-          
-          // Update point counter from background service
-          int? storedPointCounter = prefs.getInt('point_counter');
-          if (storedPointCounter != null) {
-            setState(() {
-              _pointCounter = storedPointCounter;
-            });
-          }
-        });
-      } else {
-        print('❌ Background tracking service not running');
-        setState(() {
-          isTripStarted = false;
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to start location tracking. Please try again.'),
-            backgroundColor: Colors.red,
+            content: Text('Trip started! Tracking location...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
+        
+      } else {
+        // MOBILE PLATFORM: Use foreground service
+        print('📱 Mobile platform detected - using foreground service');
+        
+        // Start the foreground service for mobile
+        ServiceRequestResult result = await FlutterForegroundTask.startService(
+          notificationTitle: 'Trip in Progress',
+          notificationText: 'Tracking your location',
+          callback: startCallback,
+        );
+
+        print('Service start result: $result');
+        
+        // Verify service is running
+        await Future.delayed(Duration(milliseconds: 500));
+        
+        if (await FlutterForegroundTask.isRunningService) {
+          print('✅ Background location tracking started successfully');
+          
+          // Timer to read speed data from background service
+          _speedUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
+            if (!mounted) return;
+            
+            SharedPreferences prefs = await SharedPreferences.getInstance();
+            
+            // Update all metrics from background service
+            setState(() {
+              double? storedMaxSpeed = prefs.getDouble('max_speed');
+              if (storedMaxSpeed != null) {
+                maxSpeed = storedMaxSpeed;
+              }
+              
+              double? storedCurrentSpeed = prefs.getDouble('current_speed');
+              if (storedCurrentSpeed != null) {
+                currentSpeed = storedCurrentSpeed;
+              }
+              
+              int? storedPointCounter = prefs.getInt('point_counter');
+              if (storedPointCounter != null) {
+                _pointCounter = storedPointCounter;
+              }
+            });
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Trip started! Background tracking active.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          print('❌ Background tracking service failed to start');
+          setState(() {
+            isTripStarted = false;
+            _elapsedTime = 0;
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to start location tracking. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } else {
-      _showPermissionDialog(
-        "Location permission is required to start the trip.",
+      _showErrorDialog(
+        'Location Permission Required',
+        'Please grant location permission to track your trips.',
       );
     }
   }
@@ -336,9 +448,15 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       isTripStarted = false;
     });
 
-    // Stop the foreground service
-    await FlutterForegroundTask.stopService();
-    print('✅ Background location tracking stopped');
+    // Stop platform-specific tracking
+    if (kIsWeb) {
+      print('🌐 Stopping web tracking');
+      // Web platform - timers will be cancelled below
+    } else {
+      // Mobile platform - stop foreground service
+      print('📱 Stopping mobile foreground service');
+      await FlutterForegroundTask.stopService();
+    }
 
     // Check network connection
     bool hasNetwork = await _checkNetworkConnection();
@@ -371,6 +489,11 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       DateTime endTime = DateTime.now();
       double durationMinutes = endTime.difference(startTime).inSeconds / 60.0;
 
+      // Ensure minimum trip duration
+      if (durationMinutes < 0.5) {
+        durationMinutes = 0.5; // Minimum 30 seconds
+      }
+
       Map<String, dynamic> finalizeData = {
         'user_id': userId,
         'trip_id': tripId,
@@ -380,7 +503,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
           'use_gps_metrics': true,
           'gps_max_speed_mph': maxSpeed,
           'actual_duration_minutes': durationMinutes,
-          'actual_distance_miles': 0.0,
+          'actual_distance_miles': (_pointCounter * 0.1), // Rough estimate
           'total_points': _pointCounter,
           'valid_points': _pointCounter,
           'rejected_points': 0,
@@ -389,85 +512,89 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         }
       };
       
-      try {
-      // Try to finalize trip with retry logic
-      bool finalized = false;
-      int retries = 0;
-      const maxRetries = 3;
+      print('📊 Finalizing trip: $tripId with $_pointCounter points');
       
-      while (!finalized && retries < maxRetries) {
-        try {
-          final response = await http.post(
-            Uri.parse(finalizeEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ${prefs.getString('access_token')}',
-            },
-            body: json.encode(finalizeData),
-          ).timeout(Duration(seconds: 10));
-          
-          if (response.statusCode == 200) {
-            finalized = true;
-            print('✅ Trip finalized successfully');
+      try {
+        // Try to finalize trip with retry logic
+        bool finalized = false;
+        int retries = 0;
+        const maxRetries = 3;
+        
+        while (!finalized && retries < maxRetries) {
+          try {
+            final response = await http.post(
+              Uri.parse(finalizeEndpoint),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: json.encode(finalizeData),
+            ).timeout(Duration(seconds: 10));
             
-            // Clear trip data
-            await prefs.remove('current_trip_id');
-            await prefs.remove('trip_start_time');
-            await prefs.setInt('batch_counter', 0);
-            await prefs.setDouble('max_speed', 0.0);
-            await prefs.setInt('point_counter', 0);
-            await prefs.setDouble('current_speed', 0.0);
-            
-            // Reset UI state
-            setState(() {
-              maxSpeed = 0.0;
-              currentSpeed = 0.0;
-              _pointCounter = 0;
-              _elapsedTime = 0;
-            });
-            
-            // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Trip saved successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else {
-            print('❌ Finalization failed with status: ${response.statusCode}');
+            if (response.statusCode == 200) {
+              finalized = true;
+              print('✅ Trip finalized successfully');
+              
+              // Clear trip data
+              await prefs.remove('current_trip_id');
+              await prefs.remove('trip_start_time');
+              await prefs.setInt('batch_counter', 0);
+              await prefs.setDouble('max_speed', 0.0);
+              await prefs.setInt('point_counter', 0);
+              await prefs.setDouble('current_speed', 0.0);
+              
+              // Reset UI state
+              setState(() {
+                maxSpeed = 0.0;
+                currentSpeed = 0.0;
+                _pointCounter = 0;
+                _elapsedTime = 0;
+                lastPosition = null;
+              });
+              
+              // Show success message
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Trip saved successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } else {
+              print('❌ Finalization failed with status: ${response.statusCode}');
+              print('Response body: ${response.body}');
+              retries++;
+              if (retries < maxRetries) {
+                await Future.delayed(Duration(seconds: 2));
+              }
+            }
+          } catch (e) {
+            print('❌ Finalization attempt ${retries + 1} failed: $e');
             retries++;
             if (retries < maxRetries) {
-              await Future.delayed(Duration(seconds: 2)); // Wait before retry
+              await Future.delayed(Duration(seconds: 2));
             }
           }
-        } catch (e) {
-          print('❌ Finalization attempt ${retries + 1} failed: $e');
-          retries++;
-          if (retries < maxRetries) {
-            await Future.delayed(Duration(seconds: 2)); // Wait before retry
-          }
         }
-      }
-      
-      if (!finalized) {
-        // All retries failed - keep trip data for manual retry later
+        
+        if (!finalized) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save trip. Please check your connection.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      } catch (error) {
+        print('❌ Error finalizing trip: $error');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save trip after $maxRetries attempts. Trip data preserved.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 5),
+            content: Text('Error saving trip: $error'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (error) {
-      print('❌ Error finalizing trip: $error');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error saving trip. Trip data preserved for retry.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    } else {
+      print('⚠️ No active trip to finalize');
     }
 
     // Stop timers
@@ -541,13 +668,27 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
-    return WillPopScope(
-      onWillPop: () async {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage(role: role)),
-        );
-        return false;
+    return PopScope(
+      canPop: !isTripStarted, // Can only navigate away when trip is NOT active
+      onPopInvoked: (bool didPop) {
+        if (didPop) return; // If pop already happened, do nothing
+        
+        // If user tried to leave during active trip
+        if (isTripStarted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please stop the trip before leaving this page'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // If trip is not active, navigate to home
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => HomePage(role: role)),
+          );
+        }
       },
       child: Scaffold(
         backgroundColor: Colors.grey[200],
@@ -572,9 +713,9 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                       SizedBox(height: screenHeight * 0.02),
                       if (isTripStarted) _buildTripStats(screenWidth),
                       if (isTripStarted) SizedBox(height: screenHeight * 0.02),
-                      _buildMapView(screenHeight, screenWidth),
-                      SizedBox(height: screenHeight * 0.01),
-                      _buildDeltaList(screenHeight, screenWidth),
+                      // _buildMapView(screenHeight, screenWidth),
+                      // SizedBox(height: screenHeight * 0.01),
+                      // _buildDeltaList(screenHeight, screenWidth),
                       SizedBox(height: screenHeight * 0.01),
                       _buildActionButton(screenWidth),
                       SizedBox(height: screenHeight * 0.01),
@@ -655,58 +796,58 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     );
   }
 
-  Widget _buildDeltaList(double screenHeight, double screenWidth) {
-    return SizedBox(
-      height: screenHeight * 0.2,
-      child: Card(
-        elevation: 8,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(screenWidth * 0.04),
-        ),
-        shadowColor: Colors.black26,
-        child: Padding(
-          padding: EdgeInsets.all(screenWidth * 0.02),
-          child:
-              false // Temporarily disabled  
-                ? ListView.builder(
-                    itemCount: 0,
-                    itemBuilder: (context, index) {
-                      var delta = {};
-                      return ListTile(
-                        leading: Icon(
-                          Icons.location_on,
-                          color: Colors.redAccent,
-                        ),
-                        title: Text(
-                          "Point #${delta['point_number']}",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          "ΔLat: ${delta['delta_latitude']}, ΔLon: ${delta['delta_longitude']}",
-                        ),
-                        tileColor:
-                            index % 2 == 0 ? Colors.grey[100] : Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            screenWidth * 0.03,
-                          ),
-                        ),
-                      );
-                    },
-                  )
-                  : Center(
-                    child: Text(
-                      "No data available",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: screenWidth * 0.04,
-                      ),
-                    ),
-                  ),
-        ),
-      ),
-    );
-  }
+  // Widget _buildDeltaList(double screenHeight, double screenWidth) {
+  //   return SizedBox(
+  //     height: screenHeight * 0.2,
+  //     child: Card(
+  //       elevation: 8,
+  //       shape: RoundedRectangleBorder(
+  //         borderRadius: BorderRadius.circular(screenWidth * 0.04),
+  //       ),
+  //       shadowColor: Colors.black26,
+  //       child: Padding(
+  //         padding: EdgeInsets.all(screenWidth * 0.02),
+  //         child:
+  //             false // Temporarily disabled  
+  //               ? ListView.builder(
+  //                   itemCount: 0,
+  //                   itemBuilder: (context, index) {
+  //                     var delta = {};
+  //                     return ListTile(
+  //                       leading: Icon(
+  //                         Icons.location_on,
+  //                         color: Colors.redAccent,
+  //                       ),
+  //                       title: Text(
+  //                         "Point #${delta['point_number']}",
+  //                         style: TextStyle(fontWeight: FontWeight.bold),
+  //                       ),
+  //                       subtitle: Text(
+  //                         "ΔLat: ${delta['delta_latitude']}, ΔLon: ${delta['delta_longitude']}",
+  //                       ),
+  //                       tileColor:
+  //                           index % 2 == 0 ? Colors.grey[100] : Colors.white,
+  //                       shape: RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.circular(
+  //                           screenWidth * 0.03,
+  //                         ),
+  //                       ),
+  //                     );
+  //                   },
+  //                 )
+  //                 : Center(
+  //                   child: Text(
+  //                     "No data available",
+  //                     style: TextStyle(
+  //                       color: Colors.grey,
+  //                       fontSize: screenWidth * 0.04,
+  //                     ),
+  //                   ),
+  //                 ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   // Widget _buildMapView(double screenHeight, double screenWidth) {
   //   return Container(
@@ -804,66 +945,66 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     );
   }
 
-  Widget _buildMapView(double screenHeight, double screenWidth) {
-    return Container(
-      height: screenHeight * 0.25,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(screenWidth * 0.03),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: screenWidth * 0.015),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(screenWidth * 0.02),
-        child: Column(
-          children: [
-            // Speed display row
-            if (isTripStarted) 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Text(
-                    'Current: ${currentSpeed.toStringAsFixed(1)} mph',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: screenWidth * 0.035,
-                    ),
-                  ),
-                  Text(
-                    'Max: ${maxSpeed.toStringAsFixed(1)} mph',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: screenWidth * 0.035,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-            SizedBox(height: 8),
-            // Map visualization
-            Expanded(
-              // Temporarily disabled
-              child: false 
-                ? CustomPaint(
-                    painter: RoutePainter([]),
-                      child: Container(),
-                    )
-                  : Center(
-                      child: Text(
-                        "No route data available",
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: screenWidth * 0.04,
-                        ),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Widget _buildMapView(double screenHeight, double screenWidth) {
+  //   return Container(
+  //     height: screenHeight * 0.25,
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(screenWidth * 0.03),
+  //       boxShadow: [
+  //         BoxShadow(color: Colors.black26, blurRadius: screenWidth * 0.015),
+  //       ],
+  //     ),
+  //     child: Padding(
+  //       padding: EdgeInsets.all(screenWidth * 0.02),
+  //       child: Column(
+  //         children: [
+  //           // Speed display row
+  //           if (isTripStarted) 
+  //             Row(
+  //               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  //               children: [
+  //                 Text(
+  //                   'Current: ${currentSpeed.toStringAsFixed(1)} mph',
+  //                   style: TextStyle(
+  //                     fontWeight: FontWeight.bold,
+  //                     fontSize: screenWidth * 0.035,
+  //                   ),
+  //                 ),
+  //                 Text(
+  //                   'Max: ${maxSpeed.toStringAsFixed(1)} mph',
+  //                   style: TextStyle(
+  //                     fontWeight: FontWeight.bold,
+  //                     fontSize: screenWidth * 0.035,
+  //                     color: Colors.red,
+  //                   ),
+  //                 ),
+  //               ],
+  //             ),
+  //           SizedBox(height: 8),
+  //           // Map visualization
+  //           Expanded(
+  //             // Temporarily disabled
+  //             child: false 
+  //               ? CustomPaint(
+  //                   painter: RoutePainter([]),
+  //                     child: Container(),
+  //                   )
+  //                 : Center(
+  //                     child: Text(
+  //                       "No route data available",
+  //                       style: TextStyle(
+  //                         color: Colors.grey,
+  //                         fontSize: screenWidth * 0.04,
+  //                       ),
+  //                     ),
+  //                   ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildActionButton(double screenWidth) {
     return Container(

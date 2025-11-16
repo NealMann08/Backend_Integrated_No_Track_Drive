@@ -35,6 +35,14 @@ class LocationTaskHandler extends TaskHandler {
             }
         }
         _lastPointTime = DateTime.now();
+        // Enable iOS background location updates
+        await Geolocator.requestPermission();
+        
+        // iOS-specific: Request always permission for background
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission != LocationPermission.always) {
+            print("WARNING: Background tracking requires 'Always' location permission on iOS");
+        }
     }
 
     @override 
@@ -44,69 +52,97 @@ class LocationTaskHandler extends TaskHandler {
 
     @override
     Future<void> onEvent(DateTime timestamp, SendPort? sendPort) async {
-        print("Location event triggered");
+        print("📍 Location event triggered at ${DateTime.now().toIso8601String()}");
         
         if (_basePoint == null) {
-            print("ERROR: No base point available, cannot calculate deltas!");
+            print("❌ ERROR: No base point available, cannot calculate deltas!");
             return;
         }
         
-        Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high);
-        
-        DateTime now = DateTime.now();
-        
-        // Calculate time difference in milliseconds
-        int deltaTimeMs = _lastPointTime != null ? 
-            now.difference(_lastPointTime!).inMilliseconds : 1000;
-        
-        // Get base point coordinates
-        double baseLat = (_basePoint!['latitude'] ?? 0.0).toDouble();
-        double baseLon = (_basePoint!['longitude'] ?? 0.0).toDouble();
-        
-        // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point)
-        int deltaLat = ((position.latitude - baseLat) * 1000000).round();
-        int deltaLon = ((position.longitude - baseLon) * 1000000).round();
-        
-        // Calculate speed
-        double speedMph = 0.0;
-        if (position.speed != null && position.speed! >= 0) {
-            speedMph = position.speed! * 2.237; // Convert m/s to mph
-        } else if (_prevLatActual != null && _prevLonActual != null) {
-            double distance = Geolocator.distanceBetween(
-                _prevLatActual!, _prevLonActual!,
-                position.latitude, position.longitude
-            ) * 0.000621371; // meters to miles
-            double timeHours = deltaTimeMs / 3600000.0; // ms to hours
-            if (timeHours > 0) speedMph = distance / timeHours;
-        }
-        
-        _deltaPoints.insert(0, {
-            'dlat': deltaLat,
-            'dlon': deltaLon,
-            'dt': deltaTimeMs,
-            't': now.toIso8601String(),
-            'p': _counter++,
-            'speed_mph': speedMph,
-            'gps_speed': position.speed,
-            'accuracy': position.accuracy,
-        });
-        // Update point counter in SharedPreferences for UI
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        await prefs.setInt('point_counter', _counter);
-        await prefs.setDouble('current_speed', speedMph);
-        print("Delta calculated - Lat: $deltaLat, Lon: $deltaLon, Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)}mph");
-        
-        // Store for next calculation
-        _prevLatActual = position.latitude;
-        _prevLonActual = position.longitude;
-        _lastPointTime = now;
-        
-        // Send batch when we have 25 points
-        if (_deltaPoints.length >= 25) {
-            print("Batch ready - sending ${_deltaPoints.length} points to server");
-            await _sendToServer();
-            _deltaPoints.clear();
+        try {
+            // Add timeout to prevent hanging
+            Position position = await Geolocator.getCurrentPosition(
+                desiredAccuracy: LocationAccuracy.high,
+            ).timeout(Duration(seconds: 10));
+            
+            print("✅ Got position: ${position.latitude}, ${position.longitude}, speed: ${position.speed}");
+            
+            DateTime now = DateTime.now();
+            
+            // Calculate time difference in milliseconds
+            int deltaTimeMs = _lastPointTime != null ? 
+                now.difference(_lastPointTime!).inMilliseconds : 1000;
+            
+            // Get base point coordinates
+            double baseLat = (_basePoint!['latitude'] ?? 0.0).toDouble();
+            double baseLon = (_basePoint!['longitude'] ?? 0.0).toDouble();
+            
+            print("📐 Base point: lat=$baseLat, lon=$baseLon");
+            
+            // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point)
+            int deltaLat = ((position.latitude - baseLat) * 1000000).round();
+            int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+            
+            // Calculate speed
+            double speedMph = 0.0;
+            if (position.speed != null && position.speed! >= 0) {
+                speedMph = position.speed! * 2.237; // Convert m/s to mph
+                print("📊 Using GPS speed: ${speedMph.toStringAsFixed(1)} mph");
+            } else if (_prevLatActual != null && _prevLonActual != null) {
+                double distance = Geolocator.distanceBetween(
+                    _prevLatActual!, _prevLonActual!,
+                    position.latitude, position.longitude
+                ) * 0.000621371; // meters to miles
+                double timeHours = deltaTimeMs / 3600000.0; // ms to hours
+                if (timeHours > 0) speedMph = distance / timeHours;
+                print("📊 Calculated speed: ${speedMph.toStringAsFixed(1)} mph");
+            }
+            
+            _deltaPoints.insert(0, {
+                'dlat': deltaLat,
+                'dlon': deltaLon,
+                'dt': deltaTimeMs,
+                't': now.toIso8601String(),
+                'p': _counter++,
+                'speed_mph': speedMph,
+                'gps_speed': position.speed,
+                'accuracy': position.accuracy,
+            });
+            
+            // Update point counter in SharedPreferences for UI
+            SharedPreferences prefs = await SharedPreferences.getInstance();
+            await prefs.setInt('point_counter', _counter);
+            await prefs.setDouble('current_speed', speedMph);
+
+            // Track max speed
+            double storedMaxSpeed = prefs.getDouble('max_speed') ?? 0.0;
+            if (speedMph > storedMaxSpeed) {
+              await prefs.setDouble('max_speed', speedMph);
+              print("🏁 New max speed: ${speedMph.toStringAsFixed(1)} mph");
+            }
+            
+            print("✅ Delta calculated - Lat: $deltaLat, Lon: $deltaLon, Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)}mph, Points: $_counter");
+            
+            // Store for next calculation
+            _prevLatActual = position.latitude;
+            _prevLonActual = position.longitude;
+            _lastPointTime = now;
+            
+            // Send batch when we have 25 points
+            if (_deltaPoints.length >= 25) {
+                print("📤 Batch ready - sending ${_deltaPoints.length} points to server");
+                await _sendToServer();
+                _deltaPoints.clear();
+            }
+            
+        } catch (e, stackTrace) {
+            print("❌ Error in location event: $e");
+            print("Stack trace: $stackTrace");
+            
+            // Handle timeout specifically
+            if (e.toString().contains('TimeoutException')) {
+                print("⏰ GPS timeout - device may be indoors or GPS is warming up");
+            }
         }
     }
 
@@ -197,6 +233,7 @@ class LocationTaskHandler extends TaskHandler {
     @override
     Future<void> onDestroy(DateTime timestamp) async {
         _timer?.cancel();
+        print('Background service destroyed');
     }
 
     @override

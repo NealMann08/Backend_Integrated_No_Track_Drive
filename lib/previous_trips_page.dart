@@ -127,11 +127,24 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
 
 
   void _sortTrips() {
-    if (_filter == 'recent') {
-      trips.sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
-    } else if (_filter == 'longest') {
-      trips.sort((a, b) => b['distance'].compareTo(a['distance']));
-    }
+    // Always sort by most recent first using proper timestamp parsing
+    trips.sort((a, b) {
+      try {
+        // Handle both 'start_timestamp' and 'timestamp' fields
+        String timeA = a['start_timestamp'] ?? a['timestamp'] ?? '';
+        String timeB = b['start_timestamp'] ?? b['timestamp'] ?? '';
+        
+        if (timeA.isEmpty || timeB.isEmpty) return 0;
+        
+        DateTime dateA = DateTime.parse(timeA);
+        DateTime dateB = DateTime.parse(timeB);
+        
+        return dateB.compareTo(dateA); // Most recent first
+      } catch (e) {
+        print('Error sorting trips: $e');
+        return 0;
+      }
+    });
   }
 
   Widget _buildStatItem(IconData icon, String label, String value) {
@@ -181,6 +194,20 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
   // revert to above if below causes issues
   List<Map<String, dynamic>> getFilteredTrips() {
     final now = DateTime.now();
+
+    // ALWAYS sort by most recent first (descending timestamp)
+    trips.sort((a, b) {
+      try {
+        String timeA = a['start_timestamp'] ?? '';
+        String timeB = b['start_timestamp'] ?? '';
+        if (timeA.isEmpty || timeB.isEmpty) return 0;
+        DateTime dateA = DateTime.parse(timeA);
+        DateTime dateB = DateTime.parse(timeB);
+        return dateB.compareTo(dateA); // Most recent first
+      } catch (e) {
+        return 0;
+      }
+    });
 
     return trips
         .whereType<Map<String, dynamic>>()
@@ -414,19 +441,48 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
                                           itemBuilder: (context, index) {
                                     final trip = filteredTrips[index];
                                     
-                                    // Parse date from your backend format
+                                    // Parse date and calculate duration properly
                                     String dateDisplay = "No date";
                                     String timeDisplay = "";
+                                    String durationDisplay = "1 min";  // Default duration
                                     DateTime? tripDate;
-                                    
+
+                                    // Parse start timestamp
                                     String startTimeStr = trip['start_timestamp'] ?? '';
+                                    String endTimeStr = trip['end_timestamp'] ?? '';
+
                                     if (startTimeStr.isNotEmpty) {
                                       try {
                                         tripDate = DateTime.parse(startTimeStr).toLocal();
                                         dateDisplay = DateFormat('MMM dd, yyyy').format(tripDate);
                                         timeDisplay = DateFormat('hh:mm a').format(tripDate);
+                                        
+                                        // Calculate actual duration from start and end timestamps
+                                        if (endTimeStr.isNotEmpty) {
+                                          DateTime endDate = DateTime.parse(endTimeStr).toLocal();
+                                          Duration tripDuration = endDate.difference(tripDate);
+                                          
+                                          // Format duration properly
+                                          if (tripDuration.inMinutes < 60) {
+                                            durationDisplay = "${tripDuration.inMinutes} min";
+                                          } else {
+                                            int hours = tripDuration.inHours;
+                                            int minutes = tripDuration.inMinutes % 60;
+                                            durationDisplay = minutes > 0 ? "$hours hr $minutes min" : "$hours hr";
+                                          }
+                                        } else if (trip['duration_minutes'] != null) {
+                                          // Fallback to duration_minutes field if no end timestamp
+                                          double durationMinutes = (trip['duration_minutes'] ?? 1.0).toDouble();
+                                          if (durationMinutes < 60) {
+                                            durationDisplay = "${durationMinutes.round()} min";
+                                          } else {
+                                            int hours = (durationMinutes / 60).floor();
+                                            int minutes = (durationMinutes % 60).round();
+                                            durationDisplay = minutes > 0 ? "$hours hr $minutes min" : "$hours hr";
+                                          }
+                                        }
                                       } catch (e) {
-                                        print('Error parsing date: $e');
+                                        print('Error parsing trip dates: $e');
                                       }
                                     }
                                     
@@ -493,7 +549,7 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
                                           ],
                                         ),
                                         subtitle: Text(
-                                          "${distance.toStringAsFixed(2)} miles • $timeDisplay",
+                                          "${distance.toStringAsFixed(2)} miles • $durationDisplay • $timeDisplay",
                                           style: TextStyle(color: Colors.grey[800]),
                                         ),
                                         trailing: Icon(
