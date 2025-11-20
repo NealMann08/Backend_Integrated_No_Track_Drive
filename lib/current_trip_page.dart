@@ -217,7 +217,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       return;
     }
     
-    // Check location permissions
+    // Check location permissions - CRITICAL for background tracking
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -225,8 +225,82 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       permission = await Geolocator.checkPermission();
     }
 
-    if (permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse) {
+    // iOS CRITICAL: Require 'Always' permission for background tracking during trips
+    if (permission == LocationPermission.whileInUse) {
+      // User has 'When In Use' but needs 'Always' for background tracking
+      bool? upgradePermission = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Background Location Required'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'To track your trips even when your phone is locked or the app is in the background, Drive Guard needs "Always" location permission.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                SizedBox(height: 12),
+                Text(
+                  'Steps:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                SizedBox(height: 8),
+                Text('1. Tap "Go to Settings" below', style: TextStyle(fontSize: 13)),
+                Text('2. Select "Location"', style: TextStyle(fontSize: 13)),
+                Text('3. Choose "Always"', style: TextStyle(fontSize: 13)),
+                Text('4. Return to app and try again', style: TextStyle(fontSize: 13)),
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '⚠️ Without "Always" permission, tracking will stop when your screen locks.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _openAppSettings();
+                  Navigator.of(context).pop(true);
+                },
+                child: Text('Go to Settings'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (upgradePermission != true) {
+        return; // User cancelled
+      }
+
+      // After returning from settings, re-check permission
+      await Future.delayed(Duration(milliseconds: 500));
+      permission = await Geolocator.checkPermission();
+
+      if (permission != LocationPermission.always) {
+        _showErrorDialog(
+          'Permission Required',
+          'Please enable "Always" location permission in Settings to start tracking.',
+        );
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.always) {
       
       // Verify base point exists
       SharedPreferences prefs = await SharedPreferences.getInstance();

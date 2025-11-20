@@ -36,13 +36,16 @@ class LocationTaskHandler extends TaskHandler {
             }
         }
         _lastPointTime = DateTime.now();
-        // Enable iOS background location updates
-        await Geolocator.requestPermission();
-        
-        // iOS-specific: Request always permission for background
+
+        // iOS-specific: Verify 'Always' permission for continuous background tracking
         LocationPermission permission = await Geolocator.checkPermission();
         if (permission != LocationPermission.always) {
-            print("WARNING: Background tracking requires 'Always' location permission on iOS");
+            print("⚠️ CRITICAL WARNING: Background tracking requires 'Always' location permission!");
+            print("⚠️ Current permission: $permission");
+            print("⚠️ Location tracking may stop when app is backgrounded or screen is locked!");
+            print("⚠️ Please enable 'Always' permission in Settings > Drive Guard > Location");
+        } else {
+            print("✅ 'Always' location permission confirmed - background tracking enabled");
         }
     }
 
@@ -62,8 +65,9 @@ class LocationTaskHandler extends TaskHandler {
         
         try {
             // Add timeout to prevent hanging
+            // Using bestForNavigation for automotive tracking - ensures continuous updates even in background
             Position position = await Geolocator.getCurrentPosition(
-                desiredAccuracy: LocationAccuracy.high,
+                desiredAccuracy: LocationAccuracy.bestForNavigation,
             ).timeout(Duration(seconds: 10));
             
             // PRIVACY: Do not log absolute coordinates

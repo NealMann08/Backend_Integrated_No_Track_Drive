@@ -52,11 +52,11 @@
 	
 	<!-- Location permissions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We need your location to track your driving trips and generate safety scores.</string>
+	<string>Drive Guard needs your location to track your driving trips and generate safety scores. Location is only collected during active trips.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>We need continuous access to your location to track trips even when the app is in the background or phone is locked.</string>
+	<string>Drive Guard requires "Always" location access to track your driving trips continuously, even when your phone screen is locked or the app is in the background. This ensures complete trip data collection for accurate safety analysis. Location is ONLY tracked during active trips when you tap "Start Tracking" - never at other times.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>We need continuous access to your location to track trips even when the app is in the background or phone is locked.</string>
+	<string>Drive Guard requires continuous location access to track complete driving trips, even when your phone is locked or the app is in the background. This is essential for accurate safety scoring. We only collect location data during active trips (when you explicitly start tracking) and never at other times. Your privacy is protected through delta-coordinate encoding.</string>
 	
 	<!-- Background modes -->
 	<key>UIBackgroundModes</key>
