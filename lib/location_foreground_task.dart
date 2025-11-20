@@ -29,7 +29,8 @@ class LocationTaskHandler extends TaskHandler {
             if (userData['base_point'] != null) {
                 _basePoint = userData['base_point'];
                 print("Base point loaded: ${_basePoint!['city']}, ${_basePoint!['state']}");
-                print("Base coordinates: ${_basePoint!['latitude']}, ${_basePoint!['longitude']}");
+                // PRIVACY: Do not log base coordinates
+                print("Base point coordinates loaded for delta calculations");
             } else {
                 print("WARNING: No base point found in user data!");
             }
@@ -65,51 +66,78 @@ class LocationTaskHandler extends TaskHandler {
                 desiredAccuracy: LocationAccuracy.high,
             ).timeout(Duration(seconds: 10));
             
-            print("✅ Got position: ${position.latitude}, ${position.longitude}, speed: ${position.speed}");
-            
+            // PRIVACY: Do not log absolute coordinates
+            print("✅ Got GPS position with accuracy: ${position.accuracy}m");
+
             DateTime now = DateTime.now();
-            
+
             // Calculate time difference in milliseconds
-            int deltaTimeMs = _lastPointTime != null ? 
+            int deltaTimeMs = _lastPointTime != null ?
                 now.difference(_lastPointTime!).inMilliseconds : 1000;
-            
+
             // Get base point coordinates
             double baseLat = (_basePoint!['latitude'] ?? 0.0).toDouble();
             double baseLon = (_basePoint!['longitude'] ?? 0.0).toDouble();
-            
-            print("📐 Base point: lat=$baseLat, lon=$baseLon");
+
+            // PRIVACY: Do not log base coordinates
+            print("📐 Base point loaded from user data");
             
             // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point)
             int deltaLat = ((position.latitude - baseLat) * 1000000).round();
             int deltaLon = ((position.longitude - baseLon) * 1000000).round();
             
-            // Calculate speed
+            // Calculate speed with improved logic
             double speedMph = 0.0;
+            bool usedGpsSpeed = false;
+
+            // Method 1: Try GPS-provided speed (most accurate when available)
             if (position.speed != null && position.speed! >= 0) {
                 speedMph = position.speed! * 2.237; // Convert m/s to mph
-                print("📊 Using GPS speed: ${speedMph.toStringAsFixed(1)} mph");
-            } else if (_prevLatActual != null && _prevLonActual != null) {
-                double distance = Geolocator.distanceBetween(
+                usedGpsSpeed = true;
+                print("📊 Using GPS speed: ${speedMph.toStringAsFixed(1)} mph (${position.speed!.toStringAsFixed(2)} m/s)");
+            }
+            // Method 2: Calculate from distance between points
+            else if (_prevLatActual != null && _prevLonActual != null && deltaTimeMs > 0) {
+                double distanceMeters = Geolocator.distanceBetween(
                     _prevLatActual!, _prevLonActual!,
                     position.latitude, position.longitude
-                ) * 0.000621371; // meters to miles
+                );
+                double distanceMiles = distanceMeters * 0.000621371; // meters to miles
                 double timeHours = deltaTimeMs / 3600000.0; // ms to hours
-                if (timeHours > 0) speedMph = distance / timeHours;
-                print("📊 Calculated speed: ${speedMph.toStringAsFixed(1)} mph");
+
+                if (timeHours > 0 && distanceMeters > 0.5) { // Ignore tiny movements (< 0.5m)
+                    speedMph = distanceMiles / timeHours;
+                    print("📊 Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m in ${deltaTimeMs}ms");
+                } else {
+                    print("📊 Stationary or minimal movement detected");
+                }
+            } else {
+                print("📊 First point - no speed data yet");
+            }
+
+            // Cap unrealistic speeds (likely GPS errors)
+            if (speedMph > 150) {
+                print("⚠️ Unrealistic speed detected: ${speedMph.toStringAsFixed(1)} mph - capping to previous speed");
+                speedMph = await SharedPreferences.getInstance().then((prefs) => prefs.getDouble('current_speed') ?? 0.0);
             }
             
+            // Store current point data
             _deltaPoints.insert(0, {
                 'dlat': deltaLat,
                 'dlon': deltaLon,
                 'dt': deltaTimeMs,
                 't': now.toIso8601String(),
-                'p': _counter++,
+                'p': _counter,
                 'speed_mph': speedMph,
                 'gps_speed': position.speed,
                 'accuracy': position.accuracy,
+                'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
             });
-            
-            // Update point counter in SharedPreferences for UI
+
+            // Increment counter AFTER using it
+            _counter++;
+
+            // Update SharedPreferences for UI (critical for real-time display)
             SharedPreferences prefs = await SharedPreferences.getInstance();
             await prefs.setInt('point_counter', _counter);
             await prefs.setDouble('current_speed', speedMph);
@@ -120,10 +148,10 @@ class LocationTaskHandler extends TaskHandler {
               await prefs.setDouble('max_speed', speedMph);
               print("🏁 New max speed: ${speedMph.toStringAsFixed(1)} mph");
             }
-            
-            print("✅ Delta calculated - Lat: $deltaLat, Lon: $deltaLon, Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)}mph, Points: $_counter");
-            
-            // Store for next calculation
+
+            print("✅ Point #$_counter - Delta: ($deltaLat, $deltaLon), Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${storedMaxSpeed > speedMph ? storedMaxSpeed.toStringAsFixed(1) : speedMph.toStringAsFixed(1)} mph");
+
+            // IMPORTANT: Store current position for NEXT speed calculation
             _prevLatActual = position.latitude;
             _prevLonActual = position.longitude;
             _lastPointTime = now;
@@ -182,10 +210,11 @@ class LocationTaskHandler extends TaskHandler {
         'timestamp': point['t'],
         'sequence': point['p'],
         'speed_mph': point['speed_mph'],
-        'speed_confidence': point['gps_speed'] != null ? 0.9 : 0.6,
+        'speed_source': point['speed_source'] ?? 'calculated',  // NEW: Track speed source
+        'speed_confidence': point['speed_source'] == 'gps' ? 0.95 : 0.7,
         'gps_accuracy': point['accuracy'] ?? 5.0,
         'is_stationary': point['speed_mph'] < 2.0,
-        'data_quality': 'high',
+        'data_quality': point['accuracy'] != null && point['accuracy'] < 10 ? 'high' : 'medium',
         'raw_speed_ms': point['gps_speed']
       });
     }

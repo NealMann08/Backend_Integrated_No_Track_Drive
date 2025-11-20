@@ -152,6 +152,48 @@ Future<CityCoordinates> getCityCoordinatesFromZipcode(String zipcode) async {
     );
   }
 
-  print('✅ Final coordinates: ${coordinates.city}, ${coordinates.state} (${coordinates.latitude}, ${coordinates.longitude})');
+  // PRIVACY: Do not log base coordinates
+  print('✅ Final base point: ${coordinates.city}, ${coordinates.state}');
   return coordinates;
+}
+
+/// Calculate delta coordinates from actual GPS position and base point
+/// Returns a map with delta_lat and delta_long as fixed-point integers (multiplied by 1,000,000)
+Map<String, int> calculateDeltaCoordinates({
+  required double actualLatitude,
+  required double actualLongitude,
+  required double baseLatitude,
+  required double baseLongitude,
+}) {
+  // Calculate deltas and multiply by 1,000,000 for fixed-point precision
+  int deltaLat = ((actualLatitude - baseLatitude) * 1000000).round();
+  int deltaLong = ((actualLongitude - baseLongitude) * 1000000).round();
+
+  return {
+    'delta_lat': deltaLat,
+    'delta_long': deltaLong,
+  };
+}
+
+/// Reconstruct actual coordinates from delta coordinates and base point
+/// Deltas should be fixed-point integers (multiplied by 1,000,000)
+Map<String, double> reconstructCoordinates({
+  required int deltaLat,
+  required int deltaLong,
+  required double baseLatitude,
+  required double baseLongitude,
+}) {
+  // Divide by 1,000,000 to convert from fixed-point integers to decimals
+  double actualLat = baseLatitude + (deltaLat / 1000000);
+  double actualLong = baseLongitude + (deltaLong / 1000000);
+
+  return {
+    'latitude': actualLat,
+    'longitude': actualLong,
+  };
+}
+
+/// Format delta coordinates for display (privacy-safe)
+String formatDeltaCoordinates(int deltaLat, int deltaLong) {
+  return 'Δ(${deltaLat}, ${deltaLong})';
 }

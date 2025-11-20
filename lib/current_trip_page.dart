@@ -299,21 +299,40 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               desiredAccuracy: LocationAccuracy.high,
             ).timeout(Duration(seconds: 5));
             
-            // Calculate speed
+            // Calculate speed (improved logic matching mobile)
             double speedMph = 0.0;
+            bool usedGpsSpeed = false;
+
+            // Method 1: Try GPS-provided speed
             if (position.speed != null && position.speed! >= 0) {
               speedMph = position.speed! * 2.237; // Convert m/s to mph
-            } else if (lastPosition != null) {
-              double distance = Geolocator.distanceBetween(
+              usedGpsSpeed = true;
+              print('📊 Web: Using GPS speed: ${speedMph.toStringAsFixed(1)} mph');
+            }
+            // Method 2: Calculate from previous position
+            else if (lastPosition != null) {
+              double distanceMeters = Geolocator.distanceBetween(
                 lastPosition!.latitude,
                 lastPosition!.longitude,
                 position.latitude,
                 position.longitude,
-              ) * 0.000621371; // meters to miles
+              );
+              double distanceMiles = distanceMeters * 0.000621371; // meters to miles
               double timeHours = 2.0 / 3600.0; // 2 seconds in hours
-              speedMph = distance / timeHours;
+
+              if (distanceMeters > 0.5) { // Ignore tiny movements
+                speedMph = distanceMiles / timeHours;
+                print('📊 Web: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
+              }
             }
-            
+
+            // Cap unrealistic speeds
+            if (speedMph > 150) {
+              speedMph = currentSpeed; // Keep previous speed
+              print('⚠️ Web: Unrealistic speed capped');
+            }
+
+            // Update state
             setState(() {
               currentSpeed = speedMph;
               if (speedMph > maxSpeed) {
@@ -321,15 +340,15 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               }
               _pointCounter++;
             });
-            
+
             lastPosition = position;
-            
+
             // Store in SharedPreferences for consistency
             await prefs.setDouble('current_speed', speedMph);
             await prefs.setDouble('max_speed', maxSpeed);
             await prefs.setInt('point_counter', _pointCounter);
-            
-            print('📍 Web tracking - Speed: ${speedMph.toStringAsFixed(1)} mph, Points: $_pointCounter');
+
+            print('📍 Web tracking - Point #$_pointCounter, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${maxSpeed.toStringAsFixed(1)} mph');
             
           } catch (e) {
             print('❌ Error getting location on web: $e');
@@ -363,29 +382,43 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         if (await FlutterForegroundTask.isRunningService) {
           print('✅ Background location tracking started successfully');
           
-          // Timer to read speed data from background service
+          // Timer to read speed data from background service - runs every 1 second
           _speedUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
-            if (!mounted) return;
-            
-            SharedPreferences prefs = await SharedPreferences.getInstance();
-            
-            // Update all metrics from background service
-            setState(() {
+            if (!mounted || !isTripStarted) {
+              timer.cancel();
+              return;
+            }
+
+            try {
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+
+              // Read all metrics from background service
               double? storedMaxSpeed = prefs.getDouble('max_speed');
-              if (storedMaxSpeed != null) {
-                maxSpeed = storedMaxSpeed;
-              }
-              
               double? storedCurrentSpeed = prefs.getDouble('current_speed');
-              if (storedCurrentSpeed != null) {
-                currentSpeed = storedCurrentSpeed;
-              }
-              
               int? storedPointCounter = prefs.getInt('point_counter');
-              if (storedPointCounter != null) {
-                _pointCounter = storedPointCounter;
+
+              // Debug logging
+              if (storedPointCounter != null && storedPointCounter > 0) {
+                print('📱 UI Update - Points: $storedPointCounter, Speed: ${storedCurrentSpeed?.toStringAsFixed(1) ?? "0.0"} mph, Max: ${storedMaxSpeed?.toStringAsFixed(1) ?? "0.0"} mph');
               }
-            });
+
+              // Update UI state
+              setState(() {
+                if (storedMaxSpeed != null) {
+                  maxSpeed = storedMaxSpeed;
+                }
+
+                if (storedCurrentSpeed != null) {
+                  currentSpeed = storedCurrentSpeed;
+                }
+
+                if (storedPointCounter != null) {
+                  _pointCounter = storedPointCounter;
+                }
+              });
+            } catch (e) {
+              print('❌ Error reading trip data from SharedPreferences: $e');
+            }
           });
           
           ScaffoldMessenger.of(context).showSnackBar(

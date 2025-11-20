@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter_settings_screens/flutter_settings_screens.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import 'account_page.dart';
 import 'package:geolocator/geolocator.dart';
+import 'geocodingutils.dart';
 
 
 
@@ -111,10 +114,42 @@ class _PrivacyPageState extends State<PrivacyPage> {
     }
 
     try {
+      // Get current position
       Position position = await Geolocator.getCurrentPosition();
-      setState(() {
-        _locationDisplay = "Location: ${position.latitude}, ${position.longitude}";
-      });
+
+      // Get user's base point for delta calculation (privacy-safe)
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? userDataJson = prefs.getString('user_data');
+
+      if (userDataJson != null) {
+        Map<String, dynamic> userData = json.decode(userDataJson);
+        if (userData['base_point'] != null) {
+          Map<String, dynamic> basePoint = userData['base_point'];
+          double baseLat = (basePoint['latitude'] ?? 0.0).toDouble();
+          double baseLon = (basePoint['longitude'] ?? 0.0).toDouble();
+
+          // Calculate privacy-safe delta coordinates
+          Map<String, int> deltas = calculateDeltaCoordinates(
+            actualLatitude: position.latitude,
+            actualLongitude: position.longitude,
+            baseLatitude: baseLat,
+            baseLongitude: baseLon,
+          );
+
+          // PRIVACY: Display only delta coordinates, not absolute location
+          setState(() {
+            _locationDisplay = "Delta from ${basePoint['city']}: Δ(${deltas['delta_lat']}, ${deltas['delta_long']})";
+          });
+        } else {
+          setState(() {
+            _locationDisplay = "No base point set - please update your zipcode";
+          });
+        }
+      } else {
+        setState(() {
+          _locationDisplay = "Not logged in";
+        });
+      }
     } catch (e) {
       setState(() {
         _locationDisplay = "Failed to get location";
