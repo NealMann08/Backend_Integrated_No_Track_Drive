@@ -1,4 +1,3 @@
-import 'dart:io'; // Add this import at the top
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
@@ -12,20 +11,6 @@ import 'ipconfig.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'location_foreground_task.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
-
-// Add this method in the CurrentTripPageState class
-Future<bool> _checkNetworkConnection() async {
-  try {
-    final result = await InternetAddress.lookup('google.com');
-    if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
-      return true;
-    }
-  } on SocketException catch (_) {
-    return false;
-  }
-  return false;
-}
 
 class CurrentTripPage extends StatefulWidget {
   const CurrentTripPage({super.key});
@@ -52,7 +37,27 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   double currentSpeed = 0.0;
   double maxSpeed = 0.0;
   Position? lastPosition;
+  final List<Map<String, dynamic>> _webDeltaPoints = []; // Store delta points for web
+  int _webBatchCounter = 0;
 
+  // Web-compatible network check
+  Future<bool> _checkNetworkConnection() async {
+    if (kIsWeb) {
+      // On web, assume network is available
+      // Web apps can't run without network anyway
+      print('🌐 Web platform - assuming network connectivity');
+      return true;
+    } else {
+      // On mobile, try a simple HTTP request
+      try {
+        final response = await http.get(Uri.parse('https://www.google.com')).timeout(Duration(seconds: 3));
+        return response.statusCode == 200;
+      } catch (e) {
+        print('❌ Network check failed: $e');
+        return false;
+      }
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -225,9 +230,9 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       permission = await Geolocator.checkPermission();
     }
 
-    // iOS CRITICAL: Require 'Always' permission for background tracking during trips
-    if (permission == LocationPermission.whileInUse) {
-      // User has 'When In Use' but needs 'Always' for background tracking
+    // PLATFORM-SPECIFIC PERMISSION HANDLING
+    if (!kIsWeb && permission == LocationPermission.whileInUse) {
+      // MOBILE ONLY: User has 'When In Use' but needs 'Always' for background tracking
       bool? upgradePermission = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -300,7 +305,17 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       }
     }
 
-    if (permission == LocationPermission.always) {
+    // PROCEED WITH TRIP START IF:
+    // - Web/Desktop: whileInUse is sufficient
+    // - Mobile: always permission is granted
+    bool hasValidPermission = kIsWeb
+        ? (permission == LocationPermission.whileInUse || permission == LocationPermission.always)
+        : permission == LocationPermission.always;
+
+    if (hasValidPermission) {
+      print('✅ Location permission validated for platform');
+      print('   Platform: ${kIsWeb ? "Web" : "Mobile"}');
+      print('   Permission level: $permission');
       
       // Verify base point exists
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -359,19 +374,29 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       // Platform-specific tracking
       if (kIsWeb) {
         // WEB PLATFORM: Use timer-based location polling
+        print('🌐 ========== WEB PLATFORM TRACKING STARTING ==========');
         print('🌐 Web platform detected - using timer-based tracking');
-        
+        print('🌐 Timer will trigger every 2 seconds to collect GPS data');
+        print('🌐 Trip ID: $tripId');
+        print('🌐 User ID: $userId');
+
         // Start a timer to collect location data every 2 seconds
         _speedUpdateTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
           if (!isTripStarted || !mounted) {
+            print('🌐 Timer cancelled - trip stopped or widget unmounted');
             timer.cancel();
             return;
           }
-          
+
+          print('🌐 ========== WEB GPS POLL #$_pointCounter ==========');
+
           try {
+            print('🌐 Requesting GPS position...');
             Position position = await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.high,
             ).timeout(Duration(seconds: 5));
+
+            print('✅ GPS position obtained - Accuracy: ${position.accuracy}m');
             
             // Calculate speed (improved logic matching mobile)
             double speedMph = 0.0;
@@ -422,18 +447,66 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             await prefs.setDouble('max_speed', maxSpeed);
             await prefs.setInt('point_counter', _pointCounter);
 
-            print('📍 Web tracking - Point #$_pointCounter, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${maxSpeed.toStringAsFixed(1)} mph');
-            
+            // Calculate delta coordinates for web (same as mobile)
+            String? userDataJson = prefs.getString('user_data');
+            if (userDataJson != null) {
+              Map<String, dynamic> userData = json.decode(userDataJson);
+              if (userData['base_point'] != null) {
+                double baseLat = (userData['base_point']['latitude'] ?? 0.0).toDouble();
+                double baseLon = (userData['base_point']['longitude'] ?? 0.0).toDouble();
+
+                int deltaLat = ((position.latitude - baseLat) * 1000000).round();
+                int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+
+                // Store delta point
+                _webDeltaPoints.add({
+                  'dlat': deltaLat,
+                  'dlon': deltaLon,
+                  'dt': 2000, // 2 seconds interval
+                  't': DateTime.now().toIso8601String(),
+                  'p': _pointCounter,
+                  'speed_mph': speedMph,
+                  'accuracy': position.accuracy,
+                  'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
+                });
+
+                print('📊 Delta point stored - Buffer size: ${_webDeltaPoints.length}/25');
+
+                // Send batch when we have 25 points
+                if (_webDeltaPoints.length >= 25) {
+                  print('📤 ========== WEB BATCH READY ==========');
+                  await _sendWebBatchToServer(prefs, userId, tripId);
+                }
+              }
+            }
+
+            print('✅ Web tracking - Point #$_pointCounter collected');
+            print('✅ Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${maxSpeed.toStringAsFixed(1)} mph');
+            print('🌐 ========== WEB GPS POLL #$_pointCounter END ==========');
+
           } catch (e) {
+            print('❌ ========== WEB GPS ERROR ==========');
             print('❌ Error getting location on web: $e');
+
+            if (e.toString().contains('TimeoutException')) {
+              print('⏰ GPS timeout - may be indoors or GPS warming up');
+            } else if (e.toString().contains('permission')) {
+              print('❌ Location permission issue');
+            }
+
+            print('🌐 ========== WEB GPS POLL #$_pointCounter END (ERROR) ==========');
           }
         });
         
+        print('✅ ========== WEB TRACKING STARTED SUCCESSFULLY ==========');
+        print('🌐 GPS polling is active - check console for updates');
+        print('🌐 UI will update with speed and point count');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Trip started! Tracking location...'),
+            content: Text('Trip started! Web tracking active - check console (F12)'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
         
@@ -442,19 +515,31 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         print('📱 Mobile platform detected - using foreground service');
         
         // Start the foreground service for mobile
+        print('🚀 ========== STARTING FOREGROUND SERVICE ==========');
+        print('📱 Platform: Mobile (Android/iOS)');
+        print('🚗 Trip ID: $tripId');
+
         ServiceRequestResult result = await FlutterForegroundTask.startService(
           notificationTitle: 'Trip in Progress',
           notificationText: 'Tracking your location',
           callback: startCallback,
         );
 
-        print('Service start result: $result');
-        
+        print('📊 Service start result: $result');
+
         // Verify service is running
-        await Future.delayed(Duration(milliseconds: 500));
-        
-        if (await FlutterForegroundTask.isRunningService) {
-          print('✅ Background location tracking started successfully');
+        await Future.delayed(Duration(milliseconds: 1000));
+
+        bool isServiceRunning = await FlutterForegroundTask.isRunningService;
+        print('🔍 Checking if service is running: $isServiceRunning');
+        print('📊 Service successfully started: $isServiceRunning');
+
+        if (isServiceRunning) {
+          print('✅ ========== FOREGROUND SERVICE STARTED SUCCESSFULLY ==========');
+          print('✅ Background location tracking is ACTIVE');
+          print('✅ GPS polling will occur every 2 seconds');
+          print('✅ Check console for location events');
+          print('✅ Look for messages like "REPEAT EVENT TRIGGERED"');
           
           // Timer to read speed data from background service - runs every 1 second
           _speedUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
@@ -472,8 +557,16 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               int? storedPointCounter = prefs.getInt('point_counter');
 
               // Debug logging
-              if (storedPointCounter != null && storedPointCounter > 0) {
-                print('📱 UI Update - Points: $storedPointCounter, Speed: ${storedCurrentSpeed?.toStringAsFixed(1) ?? "0.0"} mph, Max: ${storedMaxSpeed?.toStringAsFixed(1) ?? "0.0"} mph');
+              // Always log UI update attempts
+              print('📱 UI Update Check - Points: ${storedPointCounter ?? 0}, Speed: ${storedCurrentSpeed?.toStringAsFixed(1) ?? "0.0"} mph, Max: ${storedMaxSpeed?.toStringAsFixed(1) ?? "0.0"} mph');
+
+              if (storedPointCounter == null || storedPointCounter == 0) {
+                // No data yet - check if service is still running
+                bool stillRunning = await FlutterForegroundTask.isRunningService;
+                if (!stillRunning) {
+                  print('❌ CRITICAL: Foreground service has stopped running!');
+                  print('❌ Location tracking is NOT active');
+                }
               }
 
               // Update UI state
@@ -503,24 +596,40 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             ),
           );
         } else {
-          print('❌ Background tracking service failed to start');
+          print('❌ ========== FOREGROUND SERVICE FAILED TO START ==========');
+          print('❌ Service start result was: $result');
+          print('❌ Service running check returned: false');
+          print('❌ Possible reasons:');
+          print('   1. Location permissions not granted');
+          print('   2. Battery optimization blocking background service');
+          print('   3. Platform-specific restrictions');
+          print('   4. Foreground service not properly configured');
+
           setState(() {
             isTripStarted = false;
             _elapsedTime = 0;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to start location tracking. Please try again.'),
+              content: Text('Failed to start location tracking. Please check permissions and try again.'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
         }
       }
     } else {
+      print('❌ Invalid location permission: $permission');
+      print('   Platform: ${kIsWeb ? "Web" : "Mobile"}');
+
+      String message = kIsWeb
+          ? 'Please allow location access in your browser to track trips.'
+          : 'Please grant "Always" location permission in Settings to track your trips.';
+
       _showErrorDialog(
         'Location Permission Required',
-        'Please grant location permission to track your trips.',
+        message,
       );
     }
   }
@@ -557,8 +666,22 @@ class CurrentTripPageState extends State<CurrentTripPage> {
 
     // Stop platform-specific tracking
     if (kIsWeb) {
-      print('🌐 Stopping web tracking');
-      // Web platform - timers will be cancelled below
+      print('🌐 ========== STOPPING WEB TRACKING ==========');
+
+      // Send any remaining delta points before stopping
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? userDataJson = prefs.getString('user_data');
+      String? tripId = prefs.getString('current_trip_id');
+
+      if (_webDeltaPoints.isNotEmpty && userDataJson != null && tripId != null) {
+        Map<String, dynamic> userData = json.decode(userDataJson);
+        String userId = userData['user_id'] ?? '';
+
+        print('📤 Sending final batch with ${_webDeltaPoints.length} remaining points');
+        await _sendWebBatchToServer(prefs, userId, tripId);
+      }
+
+      print('🌐 Web tracking stopped');
     } else {
       // Mobile platform - stop foreground service
       print('📱 Stopping mobile foreground service');
@@ -656,6 +779,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                 _pointCounter = 0;
                 _elapsedTime = 0;
                 lastPosition = null;
+                _webDeltaPoints.clear(); // Clear web delta buffer
+                _webBatchCounter = 0; // Reset batch counter
               });
               
               // Show success message
@@ -709,6 +834,91 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     _speedUpdateTimer?.cancel();
     
     setState(() {});
+  }
+
+  Future<void> _sendWebBatchToServer(SharedPreferences prefs, String userId, String tripId) async {
+    print('🌐 ========== SENDING WEB BATCH TO SERVER ==========');
+
+    _webBatchCounter++;
+    int batchNumber = _webBatchCounter;
+
+    print('👤 User ID: $userId');
+    print('🚗 Trip ID: $tripId');
+    print('📦 Batch number: $batchNumber');
+    print('📊 Delta points: ${_webDeltaPoints.length}');
+
+    // Transform delta points to match backend format
+    List<Map<String, dynamic>> deltas = [];
+    for (int i = 0; i < _webDeltaPoints.length; i++) {
+      var point = _webDeltaPoints[i];
+
+      deltas.add({
+        'delta_lat': point['dlat'],
+        'delta_long': point['dlon'],
+        'delta_time': point['dt'].toDouble(),
+        'timestamp': point['t'],
+        'sequence': point['p'],
+        'speed_mph': point['speed_mph'],
+        'speed_source': point['speed_source'] ?? 'calculated',
+        'speed_confidence': point['speed_source'] == 'gps' ? 0.95 : 0.7,
+        'gps_accuracy': point['accuracy'] ?? 5.0,
+        'is_stationary': point['speed_mph'] < 2.0,
+        'data_quality': point['accuracy'] != null && point['accuracy'] < 10 ? 'high' : 'medium',
+      });
+    }
+
+    // Prepare batch data matching backend format
+    Map<String, dynamic> data = {
+      'user_id': userId,
+      'trip_id': tripId,
+      'batch_number': batchNumber,
+      'batch_size': deltas.length,
+      'first_point_timestamp': _webDeltaPoints.isNotEmpty ? _webDeltaPoints.last['t'] : DateTime.now().toIso8601String(),
+      'last_point_timestamp': _webDeltaPoints.isNotEmpty ? _webDeltaPoints.first['t'] : DateTime.now().toIso8601String(),
+      'deltas': deltas,
+      'quality_metrics': {
+        'valid_points': deltas.length,
+        'rejected_points': 0,
+        'average_accuracy': 5.0,
+        'speed_data_quality': 0.8,
+        'gps_quality_score': 0.9,
+      }
+    };
+
+    print('📡 Making HTTP POST request to backend...');
+    print('🌐 Endpoint: $trajectoryEndpoint');
+
+    try {
+      final response = await http.post(
+        Uri.parse(trajectoryEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(data),
+      ).timeout(Duration(seconds: 30));
+
+      print('📡 Response received: Status ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        print('✅ ========== WEB BATCH UPLOADED SUCCESSFULLY ==========');
+        print('✅ Batch #$batchNumber uploaded successfully');
+        print('✅ Response body: ${response.body}');
+
+        // Clear the batch after successful upload
+        _webDeltaPoints.clear();
+        print('📦 Buffer cleared, ready for next batch');
+      } else {
+        print('❌ ========== WEB BATCH UPLOAD FAILED ==========');
+        print('❌ Batch upload failed: ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
+      }
+    } catch (e, stackTrace) {
+      print('❌ ========== WEB BATCH UPLOAD ERROR ==========');
+      print('❌ Batch upload error: $e');
+      print('❌ Stack trace: $stackTrace');
+    }
+
+    print('🌐 ========== WEB BATCH SEND COMPLETE ==========');
   }
 
   void _showErrorDialog(String title, String message) {

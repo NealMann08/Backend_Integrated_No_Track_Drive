@@ -20,42 +20,85 @@ class LocationTaskHandler extends TaskHandler {
 
     @override
     Future<void> onStart(DateTime timestamp, TaskStarter task) async {
-        print("Loading user base point for delta calculations...");
+        print("========== FOREGROUND TASK STARTING ==========");
+        print("🚀 onStart called at: ${timestamp.toIso8601String()}");
+        print("📦 Loading user base point for delta calculations...");
+
         SharedPreferences prefs = await SharedPreferences.getInstance();
         String? userDataJson = prefs.getString('user_data');
-        
+
         if (userDataJson != null) {
+            print("✅ User data found in SharedPreferences");
             Map<String, dynamic> userData = json.decode(userDataJson);
+            print("👤 User ID: ${userData['user_id'] ?? 'NOT FOUND'}");
+
             if (userData['base_point'] != null) {
                 _basePoint = userData['base_point'];
-                print("Base point loaded: ${_basePoint!['city']}, ${_basePoint!['state']}");
+                print("✅ Base point loaded: ${_basePoint!['city']}, ${_basePoint!['state']}");
+                print("✅ Base point has latitude: ${_basePoint!['latitude'] != null}");
+                print("✅ Base point has longitude: ${_basePoint!['longitude'] != null}");
                 // PRIVACY: Do not log base coordinates
-                print("Base point coordinates loaded for delta calculations");
+                print("✅ Base point coordinates loaded for delta calculations");
             } else {
-                print("WARNING: No base point found in user data!");
+                print("❌ WARNING: No base point found in user data!");
+                print("❌ User needs to set up their zipcode in profile");
+                print("❌ Location tracking will NOT work without base point");
             }
+        } else {
+            print("❌ CRITICAL: No user data found in SharedPreferences!");
+            print("❌ User needs to log in again");
         }
-        _lastPointTime = DateTime.now();
 
-        // iOS-specific: Verify 'Always' permission for continuous background tracking
+        _lastPointTime = DateTime.now();
+        print("⏰ Last point time initialized: ${_lastPointTime!.toIso8601String()}");
+
+        // Verify location permissions
         LocationPermission permission = await Geolocator.checkPermission();
-        if (permission != LocationPermission.always) {
-            print("⚠️ CRITICAL WARNING: Background tracking requires 'Always' location permission!");
-            print("⚠️ Current permission: $permission");
-            print("⚠️ Location tracking may stop when app is backgrounded or screen is locked!");
-            print("⚠️ Please enable 'Always' permission in Settings > Drive Guard > Location");
+        print("📍 Current location permission: $permission");
+
+        if (permission != LocationPermission.always && permission != LocationPermission.whileInUse) {
+            print("❌ CRITICAL WARNING: No location permission granted!");
+            print("❌ Current permission: $permission");
+            print("❌ Location tracking will NOT work!");
+        } else if (permission == LocationPermission.whileInUse) {
+            print("⚠️ WARNING: Only 'While Using' permission granted");
+            print("⚠️ Background tracking may stop when app is backgrounded!");
+            print("⚠️ Recommend upgrading to 'Always' permission");
         } else {
             print("✅ 'Always' location permission confirmed - background tracking enabled");
         }
+
+        // Verify location services are enabled
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+            print("❌ CRITICAL WARNING: Location services are DISABLED on device!");
+            print("❌ User must enable location services in device settings");
+        } else {
+            print("✅ Location services are enabled on device");
+        }
+
+        // Verify trip ID exists
+        String? tripId = prefs.getString('current_trip_id');
+        if (tripId != null) {
+            print("✅ Active trip ID found: $tripId");
+        } else {
+            print("⚠️ No trip ID found yet (will be set when trip starts)");
+        }
+
+        print("========== FOREGROUND TASK STARTED SUCCESSFULLY ==========");
+        print("🔄 Event loop will trigger every 2 seconds");
+        print("🛰️ GPS tracking is now active");
     }
 
-    @override 
+    @override
     void onRepeatEvent(DateTime timestamp) async {
+        print("🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: ${timestamp.toIso8601String()}");
         await onEvent(timestamp, null);
     }
 
     @override
     Future<void> onEvent(DateTime timestamp, SendPort? sendPort) async {
+        print("📍 ========== LOCATION EVENT #$_counter START ==========");
         print("📍 Location event triggered at ${DateTime.now().toIso8601String()}");
         
         if (_basePoint == null) {
@@ -64,14 +107,25 @@ class LocationTaskHandler extends TaskHandler {
         }
         
         try {
+            print("🛰️ Requesting GPS position...");
+
+            // Check if location services are enabled
+            bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+            if (!serviceEnabled) {
+                print("❌ CRITICAL: Location services are disabled on device!");
+                print("❌ User needs to enable location services in device settings");
+                return;
+            }
+
             // Add timeout to prevent hanging
             // Using bestForNavigation for automotive tracking - ensures continuous updates even in background
             Position position = await Geolocator.getCurrentPosition(
                 desiredAccuracy: LocationAccuracy.bestForNavigation,
             ).timeout(Duration(seconds: 10));
-            
+
             // PRIVACY: Do not log absolute coordinates
             print("✅ Got GPS position with accuracy: ${position.accuracy}m");
+            print("✅ GPS speed provided: ${position.speed != null ? '${position.speed} m/s' : 'NOT AVAILABLE'}");
 
             DateTime now = DateTime.now();
 
@@ -154,53 +208,73 @@ class LocationTaskHandler extends TaskHandler {
             }
 
             print("✅ Point #$_counter - Delta: ($deltaLat, $deltaLon), Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${storedMaxSpeed > speedMph ? storedMaxSpeed.toStringAsFixed(1) : speedMph.toStringAsFixed(1)} mph");
+            print("📊 Current buffer size: ${_deltaPoints.length} points (will send at 25)");
 
             // IMPORTANT: Store current position for NEXT speed calculation
             _prevLatActual = position.latitude;
             _prevLonActual = position.longitude;
             _lastPointTime = now;
-            
+
             // Send batch when we have 25 points
             if (_deltaPoints.length >= 25) {
+                print("📤 ========== BATCH THRESHOLD REACHED ==========");
                 print("📤 Batch ready - sending ${_deltaPoints.length} points to server");
                 await _sendToServer();
                 _deltaPoints.clear();
+                print("📤 Batch sent successfully, buffer cleared");
             }
+
+            print("📍 ========== LOCATION EVENT #$_counter END ==========");
             
         } catch (e, stackTrace) {
+            print("❌ ========== ERROR IN LOCATION EVENT #$_counter ==========");
             print("❌ Error in location event: $e");
-            print("Stack trace: $stackTrace");
-            
+            print("❌ Stack trace: $stackTrace");
+
             // Handle timeout specifically
             if (e.toString().contains('TimeoutException')) {
                 print("⏰ GPS timeout - device may be indoors or GPS is warming up");
+                print("⏰ Will try again in next cycle (2 seconds)");
+            } else if (e.toString().contains('permission')) {
+                print("❌ Permission error - location permissions may have been revoked");
+            } else {
+                print("❌ Unknown error type - check stack trace above");
             }
+
+            print("📍 ========== LOCATION EVENT #$_counter END (WITH ERROR) ==========");
         }
     }
 
     Future<void> _sendToServer() async {
+    print("🌐 ========== SENDING BATCH TO SERVER ==========");
+
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? userDataJson = prefs.getString('user_data');
-    
+
     if (userDataJson == null) {
-      print('Background: No user data found');
+      print('❌ Background: No user data found in SharedPreferences');
+      print('❌ Cannot send batch without user data');
       return;
     }
-    
+
     Map<String, dynamic> userData = json.decode(userDataJson);
     String userId = userData['user_id'] ?? '';
-    
+    print("👤 User ID: $userId");
+
     // Get or create trip ID
     String? tripId = prefs.getString('current_trip_id');
     if (tripId == null || tripId.isEmpty) {
-      print('Background: No active trip ID found');
+      print('❌ Background: No active trip ID found in SharedPreferences');
+      print('❌ Cannot send batch without trip ID');
       return;
     }
-    
+    print("🚗 Trip ID: $tripId");
+
     // Get batch number from stored counter
     int batchNumber = prefs.getInt('batch_counter') ?? 0;
     batchNumber++;
     await prefs.setInt('batch_counter', batchNumber);
+    print("📦 Batch number: $batchNumber");
     
     // Transform delta points to match backend format
     List<Map<String, dynamic>> deltas = [];
@@ -242,25 +316,44 @@ class LocationTaskHandler extends TaskHandler {
     };
     
     print('🚀 Background: Sending batch #$batchNumber with ${deltas.length} deltas');
-    
+    print('📊 Batch data size: ${json.encode(data).length} bytes');
+    print('🌐 Endpoint: https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/store-trajectory-batch');
+
     try {
+      print('📡 Making HTTP POST request...');
+
       final response = await http.post(
         Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/store-trajectory-batch'),
         headers: {
           'Content-Type': 'application/json',
         },
         body: json.encode(data),
-      );
-      
+      ).timeout(Duration(seconds: 30));
+
+      print('📡 Response received: Status ${response.statusCode}');
+
       if (response.statusCode == 200) {
-        print('Background: Batch uploaded successfully');
+        print('✅ ========== BATCH UPLOADED SUCCESSFULLY ==========');
+        print('✅ Background: Batch #$batchNumber uploaded successfully');
+        print('✅ Response body: ${response.body}');
       } else {
-        print('Background: Batch upload failed: ${response.statusCode}');
-        print('Response: ${response.body}');
+        print('❌ ========== BATCH UPLOAD FAILED ==========');
+        print('❌ Background: Batch upload failed: ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
       }
-    } catch (e) {
-      print('Background: Batch upload error: $e');
+    } catch (e, stackTrace) {
+      print('❌ ========== BATCH UPLOAD ERROR ==========');
+      print('❌ Background: Batch upload error: $e');
+      print('❌ Stack trace: $stackTrace');
+
+      if (e.toString().contains('TimeoutException')) {
+        print('⏰ Network timeout - batch will be lost (no retry logic)');
+      } else if (e.toString().contains('SocketException')) {
+        print('📡 No internet connection - batch will be lost');
+      }
     }
+
+    print("🌐 ========== BATCH SEND COMPLETE ==========");
 }
 
     @override
