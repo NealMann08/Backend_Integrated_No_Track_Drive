@@ -342,3 +342,77 @@ js_primitives.dart:28 🌐 Web platform - assuming network connectivity
 js_primitives.dart:28 📊 Finalizing trip: trip_aac094b6-8067-40d1-8c52-2669a48d17ac_1763622559311 with 27 points
 js_primitives.dart:28 🌐 Timer cancelled - trip stopped or widget unmounted
 js_primitives.dart:28 ✅ Trip finalized successfully
+
+# November 20th  - Essentially the app seems to be receiving data when testing on computer device the points counter does increase however coordinates change remains zero since computer is not moving, however same app when run on iphone does not even accumulate teh number of points, even upon moving, not sure what issue is but below are the logs
+
+flutter: Sending login request: {email: nm08@gmail.com, password: Winter@1, mode: signin}
+flutter: Auth response received: Login successful
+flutter: Login mode: true, Backend role: driver, Final navigation role: user
+flutter: ✅ New trip started: trip_a6d2d070-7a66-45b0-a899-63d733467955_1763691708912_326265
+flutter: Base point: Dublin, CA
+flutter: Location permission granted.
+flutter: ✅ Location permission validated for platform
+flutter:    Platform: Mobile
+flutter:    Permission level: LocationPermission.always
+flutter: ✅ Created trip: trip_a6d2d070-7a66-45b0-a899-63d733467955_1763691714421
+flutter: 📱 Mobile platform detected - using foreground service
+flutter: 🚀 ========== STARTING FOREGROUND SERVICE ==========
+flutter: 📱 Platform: Mobile (Android/iOS)
+flutter: 🚗 Trip ID: trip_a6d2d070-7a66-45b0-a899-63d733467955_1763691714421
+Please register the registerPlugins function using the SwiftFlutterForegroundTaskPlugin.setPluginRegistrantCallback.
+flutter: 📊 Service start result: Instance of 'ServiceRequestSuccess'
+flutter: 🔍 Checking if service is running: true
+flutter: 📊 Service successfully started: true
+flutter: ✅ ========== FOREGROUND SERVICE STARTED SUCCESSFULLY ==========
+flutter: ✅ Background location tracking is ACTIVE
+flutter: ✅ GPS polling will occur every 2 seconds
+flutter: ✅ Check console for location events
+flutter: ✅ Look for messages like "REPEAT EVENT TRIGGERED"
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 Stopping mobile foreground service
+flutter: 📊 Finalizing trip: trip_a6d2d070-7a66-45b0-a899-63d733467955_1763691714421 with 0 points
+flutter: ✅ Trip finalized successfully
+
