@@ -12,6 +12,14 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'location_foreground_task.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+// CRITICAL FOR iOS: This callback MUST be a top-level function (outside any class)
+// iOS requires this because the foreground task runs in a separate isolate
+// and cannot access instance methods or class members
+@pragma('vm:entry-point')
+void startCallback() {
+  FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
+}
+
 class CurrentTripPage extends StatefulWidget {
   const CurrentTripPage({super.key});
 
@@ -632,11 +640,6 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         message,
       );
     }
-  }
-
-  @pragma('vm:entry-point')
-  void startCallback() {
-    FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
   }
 
   // Stop the trip but KEEP delta points visible

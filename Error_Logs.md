@@ -416,3 +416,396 @@ flutter: 📱 Stopping mobile foreground service
 flutter: 📊 Finalizing trip: trip_a6d2d070-7a66-45b0-a899-63d733467955_1763691714421 with 0 points
 flutter: ✅ Trip finalized successfully
 
+# NOVEMBER 20th 10pm
+
+# Exact error that occurs when I try to do step three of your build process with flutter build ios --release, is this a big problem that needs to be fixed or no? Can i skip this step It might just have something to do with my xcode setup? 
+
+sandeepmann@macbookpro Backend_Integrated_No_Track_Drive % flutter build ios --release
+
+Building com.neal.driveGuard for device (ios-release)...
+Automatically signing iOS for device deployment using specified development team in Xcode project: 32L9HYCPDN
+Running pod install...                                           2,718ms
+Running Xcode build...                                                  
+Xcode build done.                                           50.4s
+Failed to build iOS app
+Error output from Xcode build:
+↳
+    AssertMacros: amdErr = AMDeviceConnect(tmpDevice) == 0 ,  file:
+    /AppleInternal/Library/BuildRoots/4~B5lnugAmzyNZn31SSjPArj8QPAbWVEgb-FGD05Y/Library/Caches/com.apple.xbs/Source
+    s/MobileDevice/Source/AMDevicePowerAssertion.c, line: 224, value: -402653083
+    ** BUILD FAILED **
+
+
+Xcode's output:
+↳
+    Writing result bundle at path:
+        /var/folders/pl/kb1_lmkj7_zgjvt_78tprkyh0000gn/T/flutter_tools.XUuiO8/flutter_ios_build_temp_direk9OJ8/tempora
+        ry_xcresult_bundle
+
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/flutter_foreground_task-8.17.0/ios/Classes/service/BackgroundServi
+    ce.swift:132:27: warning: 'alert' was deprecated in iOS 14.0
+          completionHandler([.alert, .sound])
+                              ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/flutter_foreground_task-8.17.0/ios/Classes/service/BackgroundServi
+    ce.swift:134:27: warning: 'alert' was deprecated in iOS 14.0
+          completionHandler([.alert])
+                              ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/flutter_foreground_task-8.17.0/ios/Classes/SwiftFlutterForegroundT
+    askPlugin.swift:180:7: warning: class 'AppRefreshOperation' must restate inherited '@unchecked Sendable'
+    conformance
+    class AppRefreshOperation: Operation {
+          ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/flutter_foreground_task-8.17.0/ios/Classes/SwiftFlutterForegroundT
+    askPlugin.swift:88:26: warning: 'setMinimumBackgroundFetchInterval' was deprecated in iOS 13.0: Use a
+    BGAppRefreshTask in the BackgroundTasks framework instead
+        UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+                             ^
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -cc1
+    -Wundef-prefix\=TARGET_OS_ -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -ferror-limit 19
+    -serialize-diagnostic-file
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/PermissionHandler.dia
+    -Wdeprecated-objc-isa-usage -Werror\=deprecated-objc-isa-usage -Werror\=implicit-function-declaration
+    -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs
+    -Wno-missing-field-initializers -Wno-missing-prototypes -Werror\=return-type -Wdocumentation -Wunreachable-code
+    -Wno-implicit-atomic-properties -Werror\=deprecated-objc-isa-usage -Wno-objc-interface-ivars
+    -Werror\=objc-root-class -Wno-arc-repeated-use-of-weak -Wimplicit-retain-self -Wduplicate-method-match
+    -Wno-missing-braces -Wparentheses -Wswitch -Wunused-function -Wno-unused-label -Wno-unused-parameter
+    -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized -Wconditional-uninitialized -Wno-unknown-pragmas
+    -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wconstant-conversion -Wint-conversion -Wbool-conversion
+    -Wenum-conversion -Wno-float-conversion -Wnon-literal-null-conversion -Wobjc-literal-conversion
+    -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-selector -Wno-strict-selector-match
+    -Wundeclared-selector -Wdeprecated-implementations -Wno-implicit-fallthrough -Wprotocol
+    -Wdeprecated-declarations -Wno-sign-conversion -Winfinite-recursion -Wcomma -Wblock-capture-autoreleasing
+    -Wstrict-prototypes -Wno-semicolon-before-method-body -Wunguarded-availability -Wno-reorder-init-list
+    -Wno-implicit-int-float-conversion -Wno-c99-designator -Wno-final-dtor-non-final-class -Wno-extra-semi-stmt
+    -Wno-misleading-indentation -Wno-quoted-include-in-framework-header -Wno-implicit-fallthrough
+    -Wno-enum-enum-conversion -Wno-enum-float-conversion -Wno-elaborated-enum-base -Wno-reserved-identifier
+    -Wno-gnu-folding-constant
+    -fmodule-map-file\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/buil
+    d/ios/Release-iphoneos/geolocator_apple/geolocator_apple.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/CoreLocation.framework/Modules/module.modulemap -o
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/PermissionHandler.o
+    -disable-free -emit-obj -x objective-c
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/PermissionHandler.m -target-abi darwinpcs -target-cpu apple-a7 -target-feature +v8a
+    -target-feature +aes -target-feature +fp-armv8 -target-feature +sha2 -target-feature +neon -target-feature +zcm
+    -target-feature +zcz -triple arm64-apple-ios14.0.0 -target-linker-version 1115.7.3 -target-sdk-version\=18.1
+    -fmodules-validate-system-headers -fno-modulemap-allow-subdirectory-search -isysroot
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk
+    -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16
+    -fmodule-format\=obj
+    -fmodule-file\=CoreLocation\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadl
+    pcmqmpqp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CoreLocation-193CSLPFPUJI5TASCUNDQLONQ.pcm
+    -fmodule-file\=Foundation\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpc
+    mqmpqp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Foundation-B8ER1U5KDKZY53BN81L7A92KB.pcm
+    -fmodule-file\=UIKit\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpq
+    p/Build/Intermediates.noindex/ExplicitPrecompiledModules/UIKit-ETTT3NA9RMWP7PDHVR8B239UT.pcm -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-own-target-headers.hmap -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-all-non-framework-target-headers.hm
+    ap -I
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/geolocator_apple/include -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources-normal/arm64 -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources/arm64 -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources -F
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/geolocator_apple -F
+    /Users/sandeepmann/Documents/Sandeep/code/flutter/flutter/bin/cache/artifacts/engine/ios-release/Flutter.xcfram
+    ework/ios-arm64 -iquote
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-generated-files.hmap -iquote
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-project-headers.hmap -isystem
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/usr/loca
+    l/include -isystem
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16/include
+    -internal-externc-isystem
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/usr/incl
+    ude -internal-externc-isystem
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -ivfsstatcache
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos18.1-22B74-456b5073a84ca8a
+    40bffd5133c40ea2b.sdkstatcache -ivfsoverlay
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/Pods-8699adb1dd336b26511df848a716bd42-VFS-iphoneos/all-product-headers.yaml
+    -std\=gnu11 -fexceptions -fmodules -fmodule-name\=geolocator_apple -fno-implicit-modules -fobjc-exceptions
+    -fmax-type-align\=16 -fpascal-strings -fstack-check -fvisibility-inlines-hidden-static-local-var
+    -mdarwin-stkchk-strong-link -fno-odr-hash-protocols -pic-level 2 -fencode-extended-block-signature
+    -stack-protector 1 -fobjc-runtime\=ios-14.0.0 -fobjc-arc -fobjc-runtime-has-weak -fobjc-weak
+    -fgnuc-version\=4.2.1 -fblocks -ffp-contract\=on -fclang-abi-compat\=4.0
+    -fno-experimental-relative-c++-abi-vtables -fno-file-reproducible
+    -clang-vendor-feature\=+disableNonDependentMemberExprInCurrentInstantiation
+    -clang-vendor-feature\=+enableAggressiveVLAFolding -clang-vendor-feature\=+revert09abecef7bbf
+    -clang-vendor-feature\=+thisNoAlignAttr -clang-vendor-feature\=+thisNoNullAttr
+    -clang-vendor-feature\=+disableAtImportPrivateFrameworkInImplementationError -O2
+    -fdebug-compilation-dir\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Driv
+    e/ios/Pods
+    -fcoverage-compilation-dir\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_D
+    rive/ios/Pods -fobjc-msgsend-selector-stubs -fregister-global-dtors-with-atexit -fno-strict-return
+    -dwarf-version\=4 -debugger-tuning\=lldb -disable-llvm-verifier -dwarf-ext-refs -mframe-pointer\=non-leaf
+    -funwind-tables\=1 -vectorize-loops -vectorize-slp -clear-ast-before-backend -discard-value-names
+    -main-file-name PermissionHandler.m -finline-functions -debug-info-kind\=standalone -Os
+    -fdiagnostics-hotness-threshold\=0 -fdiagnostics-misexpect-tolerance\=0 -D COCOAPODS\=1 -D
+    NS_BLOCK_ASSERTIONS\=1 -D OBJC_OLD_DISPATCH_PROTOTYPES\=0 -D POD_CONFIGURATION_RELEASE\=1 -D
+    __GCC_HAVE_DWARF2_CFI_ASM\=1 -include
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/ios/Pods/Target\
+    Support\ Files/geolocator_apple/geolocator_apple-prefix.pch -MT dependencies -dependency-file
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/PermissionHandler.d
+    -skip-unused-modulemap-deps
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/PermissionHandler.m:40:31: warning: 'authorizationStatus' is deprecated: first deprecated in
+    iOS 14.0 [-Wdeprecated-declarations]
+       40 |     return [CLLocationManager authorizationStatus];
+          |                               ^~~~~~~~~~~~~~~~~~~
+          |                               authorizationStatus
+    In module 'CoreLocation' imported from
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/../include/geolocator_apple/Handlers/PermissionHandler.h:11:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/System/L
+    ibrary/Frameworks/CoreLocation.framework/Headers/CLLocationManager.h:231:1: note: 'authorizationStatus' has
+    been explicitly marked deprecated here
+      231 | + (CLAuthorizationStatus)authorizationStatus API_DEPRECATED_WITH_REPLACEMENT("-authorizationStatus",
+      ios(4.2, 14.0), macos(10.7, 11.0), watchos(1.0, 7.0), tvos(9.0, 14.0));
+          | ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/PermissionHandler.m:47:65: warning: 'authorizationStatus' is deprecated: first deprecated in
+    iOS 14.0 [-Wdeprecated-declarations]
+       47 |   CLAuthorizationStatus authorizationStatus = CLLocationManager.authorizationStatus;
+          |                                                                 ^~~~~~~~~~~~~~~~~~~
+          |                                                                 authorizationStatus
+    In module 'CoreLocation' imported from
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/../include/geolocator_apple/Handlers/PermissionHandler.h:11:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/System/L
+    ibrary/Frameworks/CoreLocation.framework/Headers/CLLocationManager.h:231:1: note: 'authorizationStatus' has
+    been explicitly marked deprecated here
+      231 | + (CLAuthorizationStatus)authorizationStatus API_DEPRECATED_WITH_REPLACEMENT("-authorizationStatus",
+      ios(4.2, 14.0), macos(10.7, 11.0), watchos(1.0, 7.0), tvos(9.0, 14.0));
+          | ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/PermissionHandler.m:47:65: warning: 'authorizationStatus' is deprecated: first deprecated in
+    iOS 14.0 [-Wdeprecated-declarations]
+       47 |   CLAuthorizationStatus authorizationStatus = CLLocationManager.authorizationStatus;
+          |                                                                 ^~~~~~~~~~~~~~~~~~~
+          |                                                                 authorizationStatus
+    In module 'CoreLocation' imported from
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/../include/geolocator_apple/Handlers/PermissionHandler.h:11:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/System/L
+    ibrary/Frameworks/CoreLocation.framework/Headers/CLLocationManager.h:231:1: note: 'authorizationStatus' has
+    been explicitly marked deprecated here
+      231 | + (CLAuthorizationStatus)authorizationStatus API_DEPRECATED_WITH_REPLACEMENT("-authorizationStatus",
+      ios(4.2, 14.0), macos(10.7, 11.0), watchos(1.0, 7.0), tvos(9.0, 14.0));
+          | ^
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/PermissionHandler.m:107:1: warning: implementing deprecated method
+    [-Wdeprecated-implementations]
+      107 | - (void) locationManager:(CLLocationManager *)manager
+      didChangeAuthorizationStatus:(CLAuthorizationStatus)status {
+          | ^
+    In module 'CoreLocation' imported from
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/../include/geolocator_apple/Handlers/PermissionHandler.h:11:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/System/L
+    ibrary/Frameworks/CoreLocation.framework/Headers/CLLocationManagerDelegate.h:208:1: note: method
+    'locationManager:didChangeAuthorizationStatus:' declared here
+      208 | - (void)locationManager:(CLLocationManager *)manager
+      didChangeAuthorizationStatus:(CLAuthorizationStatus)status
+      API_DEPRECATED_WITH_REPLACEMENT("-locationManagerDidChangeAuthorization:", ios(4.2, 14.0), macos(10.7, 11.0),
+      watchos(1.0, 7.0), tvos(9.0, 14.0));
+          | ^
+    4 warnings generated.
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -cc1
+    -Wundef-prefix\=TARGET_OS_ -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\=0 -ferror-limit 19
+    -serialize-diagnostic-file
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/LocationServiceStreamHandler.di
+    a -Wdeprecated-objc-isa-usage -Werror\=deprecated-objc-isa-usage -Werror\=implicit-function-declaration
+    -Wnon-modular-include-in-framework-module -Werror\=non-modular-include-in-framework-module -Wno-trigraphs
+    -Wno-missing-field-initializers -Wno-missing-prototypes -Werror\=return-type -Wdocumentation -Wunreachable-code
+    -Wno-implicit-atomic-properties -Werror\=deprecated-objc-isa-usage -Wno-objc-interface-ivars
+    -Werror\=objc-root-class -Wno-arc-repeated-use-of-weak -Wimplicit-retain-self -Wduplicate-method-match
+    -Wno-missing-braces -Wparentheses -Wswitch -Wunused-function -Wno-unused-label -Wno-unused-parameter
+    -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized -Wconditional-uninitialized -Wno-unknown-pragmas
+    -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wconstant-conversion -Wint-conversion -Wbool-conversion
+    -Wenum-conversion -Wno-float-conversion -Wnon-literal-null-conversion -Wobjc-literal-conversion
+    -Wshorten-64-to-32 -Wpointer-sign -Wno-newline-eof -Wno-selector -Wno-strict-selector-match
+    -Wundeclared-selector -Wdeprecated-implementations -Wno-implicit-fallthrough -Wprotocol
+    -Wdeprecated-declarations -Wno-sign-conversion -Winfinite-recursion -Wcomma -Wblock-capture-autoreleasing
+    -Wstrict-prototypes -Wno-semicolon-before-method-body -Wunguarded-availability -Wno-reorder-init-list
+    -Wno-implicit-int-float-conversion -Wno-c99-designator -Wno-final-dtor-non-final-class -Wno-extra-semi-stmt
+    -Wno-misleading-indentation -Wno-quoted-include-in-framework-header -Wno-implicit-fallthrough
+    -Wno-enum-enum-conversion -Wno-enum-float-conversion -Wno-elaborated-enum-base -Wno-reserved-identifier
+    -Wno-gnu-folding-constant
+    -fmodule-map-file\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/buil
+    d/ios/Release-iphoneos/geolocator_apple/geolocator_apple.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/UIKit.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/Foundation.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhone
+    OS.sdk/System/Library/Frameworks/CoreLocation.framework/Modules/module.modulemap
+    -fmodule-map-file\=/Users/sandeepmann/Documents/Sandeep/code/flutter/flutter/bin/cache/artifacts/engine/ios-rel
+    ease/Flutter.xcframework/ios-arm64/Flutter.framework/Modules/module.modulemap -o
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/LocationServiceStreamHandler.o
+    -disable-free -emit-obj -x objective-c
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/LocationServiceStreamHandler.m -target-abi darwinpcs -target-cpu apple-a7 -target-feature +v8a
+    -target-feature +aes -target-feature +fp-armv8 -target-feature +sha2 -target-feature +neon -target-feature +zcm
+    -target-feature +zcz -triple arm64-apple-ios14.0.0 -target-linker-version 1115.7.3 -target-sdk-version\=18.1
+    -fmodules-validate-system-headers -fno-modulemap-allow-subdirectory-search -isysroot
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk
+    -resource-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16
+    -fmodule-format\=obj
+    -fmodule-file\=CoreLocation\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadl
+    pcmqmpqp/Build/Intermediates.noindex/ExplicitPrecompiledModules/CoreLocation-193CSLPFPUJI5TASCUNDQLONQ.pcm
+    -fmodule-file\=Flutter\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqm
+    pqp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Flutter-9O8P7TKHTHSJ0W7S1E9PJ7JJC.pcm
+    -fmodule-file\=Foundation\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpc
+    mqmpqp/Build/Intermediates.noindex/ExplicitPrecompiledModules/Foundation-B8ER1U5KDKZY53BN81L7A92KB.pcm
+    -fmodule-file\=UIKit\=/Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpq
+    p/Build/Intermediates.noindex/ExplicitPrecompiledModules/UIKit-ETTT3NA9RMWP7PDHVR8B239UT.pcm -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-own-target-headers.hmap -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-all-non-framework-target-headers.hm
+    ap -I
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/geolocator_apple/include -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources-normal/arm64 -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources/arm64 -I
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/DerivedSources -F
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/geolocator_apple -F
+    /Users/sandeepmann/Documents/Sandeep/code/flutter/flutter/bin/cache/artifacts/engine/ios-release/Flutter.xcfram
+    ework/ios-arm64 -iquote
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-generated-files.hmap -iquote
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/geolocator_apple-project-headers.hmap -isystem
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/usr/loca
+    l/include -isystem
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16/include
+    -internal-externc-isystem
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/usr/incl
+    ude -internal-externc-isystem
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include -ivfsstatcache
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos18.1-22B74-456b5073a84ca8a
+    40bffd5133c40ea2b.sdkstatcache -ivfsoverlay
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/Pods-8699adb1dd336b26511df848a716bd42-VFS-iphoneos/all-product-headers.yaml
+    -std\=gnu11 -fexceptions -fmodules -fmodule-name\=geolocator_apple -fno-implicit-modules -fobjc-exceptions
+    -fmax-type-align\=16 -fpascal-strings -fstack-check -fvisibility-inlines-hidden-static-local-var
+    -mdarwin-stkchk-strong-link -fno-odr-hash-protocols -pic-level 2 -fencode-extended-block-signature
+    -stack-protector 1 -fobjc-runtime\=ios-14.0.0 -fobjc-arc -fobjc-runtime-has-weak -fobjc-weak
+    -fgnuc-version\=4.2.1 -fblocks -ffp-contract\=on -fclang-abi-compat\=4.0
+    -fno-experimental-relative-c++-abi-vtables -fno-file-reproducible
+    -clang-vendor-feature\=+disableNonDependentMemberExprInCurrentInstantiation
+    -clang-vendor-feature\=+enableAggressiveVLAFolding -clang-vendor-feature\=+revert09abecef7bbf
+    -clang-vendor-feature\=+thisNoAlignAttr -clang-vendor-feature\=+thisNoNullAttr
+    -clang-vendor-feature\=+disableAtImportPrivateFrameworkInImplementationError -O2
+    -fdebug-compilation-dir\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Driv
+    e/ios/Pods
+    -fcoverage-compilation-dir\=/Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_D
+    rive/ios/Pods -fobjc-msgsend-selector-stubs -fregister-global-dtors-with-atexit -fno-strict-return
+    -dwarf-version\=4 -debugger-tuning\=lldb -disable-llvm-verifier -dwarf-ext-refs -mframe-pointer\=non-leaf
+    -funwind-tables\=1 -vectorize-loops -vectorize-slp -clear-ast-before-backend -discard-value-names
+    -main-file-name LocationServiceStreamHandler.m -finline-functions -debug-info-kind\=standalone -Os
+    -fdiagnostics-hotness-threshold\=0 -fdiagnostics-misexpect-tolerance\=0 -D COCOAPODS\=1 -D
+    NS_BLOCK_ASSERTIONS\=1 -D OBJC_OLD_DISPATCH_PROTOTYPES\=0 -D POD_CONFIGURATION_RELEASE\=1 -D
+    __GCC_HAVE_DWARF2_CFI_ASM\=1 -include
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/ios/Pods/Target\
+    Support\ Files/geolocator_apple/geolocator_apple-prefix.pch -MT dependencies -dependency-file
+    /Users/sandeepmann/Library/Developer/Xcode/DerivedData/Runner-cdzkurfjewjsrcdhcadlpcmqmpqp/Build/Intermediates.
+    noindex/Pods.build/Release-iphoneos/geolocator_apple.build/Objects-normal/arm64/LocationServiceStreamHandler.d
+    -skip-unused-modulemap-deps
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/LocationServiceStreamHandler.m:36:1: warning: implementing deprecated method
+    [-Wdeprecated-implementations]
+       36 | - (void)locationManager:(CLLocationManager *)manager
+       didChangeAuthorizationStatus:(CLAuthorizationStatus)status{
+          | ^
+    In module 'CoreLocation' imported from
+    /Users/sandeepmann/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/darwin/geolocator_apple/Sources/geolocator
+    _apple/Handlers/LocationServiceStreamHandler.m:9:
+    /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.1.sdk/System/L
+    ibrary/Frameworks/CoreLocation.framework/Headers/CLLocationManagerDelegate.h:208:1: note: method
+    'locationManager:didChangeAuthorizationStatus:' declared here
+      208 | - (void)locationManager:(CLLocationManager *)manager
+      didChangeAuthorizationStatus:(CLAuthorizationStatus)status
+      API_DEPRECATED_WITH_REPLACEMENT("-locationManagerDidChangeAuthorization:", ios(4.2, 14.0), macos(10.7, 11.0),
+      watchos(1.0, 7.0), tvos(9.0, 14.0));
+          | ^
+    1 warning generated.
+    Target release_unpack_ios failed: Exception: Failed to codesign
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/Flutter.framework/Flutter with identity 483C2F9E3B529CD446097800BAD69A45B61F63D7.
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/Flutter.framework/Flutter: replacing existing signature
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/build/ios/Release-iphon
+    eos/Flutter.framework/Flutter: resource fork, Finder information, or similar detritus not allowed
+    Failed to package /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive.
+    Command PhaseScriptExecution failed with a nonzero exit code
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'GoogleMaps' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'path_provider_foundation-path_provider_foundation_privacy' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'shared_preferences_foundation-shared_preferences_foundation_privacy' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'shared_preferences_foundation' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'path_provider_foundation' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'image_picker_ios-image_picker_ios_privacy' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'image_picker_ios' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'google_maps_flutter_ios-google_maps_flutter_ios_privacy' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'google_maps_flutter_ios' from project 'Pods')
+    /Users/sandeepmann/Documents/Neal/No_Track_Drive_Neal/Backend_Integrated_No_Track_Drive/ios/Pods/Pods.xcodeproj
+    : warning: The iOS deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to 11.0, but the range of supported
+    deployment target versions is 12.0 to 18.1.99. (in target 'geolocator_apple-geolocator_apple_privacy' from
+    project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'geolocator_apple-geolocator_apple_privacy' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'geolocator_apple' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'flutter_keyboard_visibility' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'flutter_foreground_task' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'Runner' from project 'Runner')
+    note: Run script build phase 'Run Script' will be run during every build because the option to run the script
+    phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    note: Run script build phase 'Thin Binary' will be run during every build because the option to run the script
+    phase "Based on dependency analysis" is unchecked. (in target 'Runner' from project 'Runner')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'Pods-Runner' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'GoogleMaps-GoogleMapsResources' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'Google-Maps-iOS-Utils' from project 'Pods')
+    note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in
+    target 'Flutter' from project 'Pods')
+
+Encountered error while building for device.
+
