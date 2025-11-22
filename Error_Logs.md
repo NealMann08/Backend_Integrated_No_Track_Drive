@@ -809,3 +809,402 @@ Xcode's output:
 
 Encountered error while building for device.
 
+# NOV 21 - Logs while testing: The app now shows more logs however the app itself does not show that the points collected is increasing, I am not able to interpret the logs either, however considering I am not moving the number of points should be accumulating however, since I am not moving the actual delta coordinates should be zero as there is no change in position or very minimal. Identify what the issue is as the points collected value is still zero and not changing.
+
+flutter: Sending signup request: {email: nov21@gmail.com, password: Winter@1, mode: signup, role: driver, name: Nov 21, zipcode: 94568, base_point: {latitude: 37.7166, longitude: -121.9226, city: Dublin, state: CA, zipcode: 94568, source: zippopotam}}
+flutter: Auth response received: Account created successfully
+flutter: Login mode: false, Backend role: driver, Final navigation role: user
+flutter: ✅ New trip started: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773460537_567869
+flutter: Base point: Dublin, CA
+flutter: Location permission granted.
+flutter: ✅ Location permission validated for platform
+flutter:    Platform: Mobile
+flutter:    Permission level: LocationPermission.always
+flutter: ✅ Created trip: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953
+flutter: 📱 Mobile platform detected - using foreground service
+flutter: 🚀 ========== STARTING FOREGROUND SERVICE ==========
+flutter: 📱 Platform: Mobile (Android/iOS)
+flutter: 🚗 Trip ID: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953
+flutter: ========== FOREGROUND TASK STARTING ==========
+flutter: 🚀 onStart called at: 2025-11-22T01:04:23.036388Z
+flutter: 📦 Loading user base point for delta calculations...
+flutter: 📊 Service start result: Instance of 'ServiceRequestSuccess'
+flutter: ✅ User data found in SharedPreferences
+flutter: 👤 User ID: a690d93c-a03a-4856-bd4e-487d8c1d58a1
+flutter: ✅ Base point loaded: Dublin, CA
+flutter: ✅ Base point has latitude: true
+flutter: ✅ Base point has longitude: true
+flutter: ✅ Base point coordinates loaded for delta calculations
+flutter: ⏰ Last point time initialized: 2025-11-21T17:04:23.038200
+flutter: 📍 Current location permission: LocationPermission.always
+flutter: ✅ 'Always' location permission confirmed - background tracking enabled
+flutter: ✅ Location services are enabled on device
+flutter: ✅ Active trip ID found: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953
+flutter: ========== FOREGROUND TASK STARTED SUCCESSFULLY ==========
+flutter: 🔄 Event loop will trigger every 2 seconds
+flutter: 🛰️ GPS tracking is now active
+flutter: 🔍 Checking if service is running: true
+flutter: 📊 Service successfully started: true
+flutter: ✅ ========== FOREGROUND SERVICE STARTED SUCCESSFULLY ==========
+flutter: ✅ Background location tracking is ACTIVE
+flutter: ✅ GPS polling will occur every 2 seconds
+flutter: ✅ Check console for location events
+flutter: ✅ Look for messages like "REPEAT EVENT TRIGGERED"
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:25.046147Z
+flutter: 📍 ========== LOCATION EVENT #0 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:25.046595
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #1 - Delta: (25456, 71442), Time: 2034ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 1 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #1 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:27.045799Z
+flutter: 📍 ========== LOCATION EVENT #1 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:27.046182
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #2 - Delta: (25456, 71442), Time: 1986ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 2 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #2 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:29.045287Z
+flutter: 📍 ========== LOCATION EVENT #2 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:29.045713
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #3 - Delta: (25456, 71442), Time: 1997ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 3 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #3 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:31.045934Z
+flutter: 📍 ========== LOCATION EVENT #3 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:31.046296
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #4 - Delta: (25456, 71442), Time: 2008ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 4 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #4 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:33.045811Z
+flutter: 📍 ========== LOCATION EVENT #4 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:33.046188
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #5 - Delta: (25456, 71442), Time: 1993ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 5 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #5 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:35.045815Z
+flutter: 📍 ========== LOCATION EVENT #5 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:35.046179
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #6 - Delta: (25456, 71442), Time: 2006ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 6 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #6 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:37.045861Z
+flutter: 📍 ========== LOCATION EVENT #6 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:37.046250
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #7 - Delta: (25456, 71442), Time: 1992ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 7 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #7 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:39.045820Z
+flutter: 📍 ========== LOCATION EVENT #7 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:39.046186
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #8 - Delta: (25456, 71442), Time: 2003ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 8 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #8 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:41.045845Z
+flutter: 📍 ========== LOCATION EVENT #8 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:41.046214
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #9 - Delta: (25456, 71442), Time: 2002ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 9 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #9 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:43.045566Z
+flutter: 📍 ========== LOCATION EVENT #9 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:43.046027
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #10 - Delta: (25456, 71442), Time: 1999ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 10 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #10 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:45.045588Z
+flutter: 📍 ========== LOCATION EVENT #10 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:45.046258
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #11 - Delta: (25456, 71442), Time: 2002ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 11 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #11 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:47.045924Z
+flutter: 📍 ========== LOCATION EVENT #11 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:47.046348
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #12 - Delta: (25456, 71442), Time: 1997ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 12 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #12 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:49.045432Z
+flutter: 📍 ========== LOCATION EVENT #12 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:49.045668
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #13 - Delta: (25456, 71442), Time: 1994ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 13 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #13 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:51.045780Z
+flutter: 📍 ========== LOCATION EVENT #13 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:51.045913
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #14 - Delta: (25456, 71442), Time: 1999ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 14 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #14 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:53.045936Z
+flutter: 📍 ========== LOCATION EVENT #14 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:53.046185
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #15 - Delta: (25456, 71442), Time: 2001ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 15 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #15 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:55.046417Z
+flutter: 📍 ========== LOCATION EVENT #15 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:55.047141
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #16 - Delta: (25456, 71442), Time: 2008ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 16 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #16 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:57.045307Z
+flutter: 📍 ========== LOCATION EVENT #16 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:57.045544
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #17 - Delta: (25456, 71442), Time: 1987ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 17 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #17 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:04:59.045738Z
+flutter: 📍 ========== LOCATION EVENT #17 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:04:59.046125
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #18 - Delta: (25456, 71442), Time: 2003ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 18 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #18 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:01.046302Z
+flutter: 📍 ========== LOCATION EVENT #18 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:01.046773
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #19 - Delta: (25456, 71442), Time: 2000ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 19 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #19 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:03.046392Z
+flutter: 📍 ========== LOCATION EVENT #19 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:03.046756
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #20 - Delta: (25456, 71442), Time: 2007ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 20 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #20 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:05.045599Z
+flutter: 📍 ========== LOCATION EVENT #20 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:05.046230
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #21 - Delta: (25456, 71442), Time: 1993ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 21 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #21 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:07.045940Z
+flutter: 📍 ========== LOCATION EVENT #21 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:07.046310
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #22 - Delta: (25456, 71442), Time: 1998ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 22 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #22 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:09.045713Z
+flutter: 📍 ========== LOCATION EVENT #22 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:09.046423
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #23 - Delta: (25456, 71442), Time: 2003ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 23 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #23 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:11.046390Z
+flutter: 📍 ========== LOCATION EVENT #23 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:11.046799
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #24 - Delta: (25456, 71442), Time: 1999ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 24 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #24 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:13.045554Z
+flutter: 📍 ========== LOCATION EVENT #24 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:13.046014
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #25 - Delta: (25456, 71442), Time: 1996ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 25 points (will send at 25)
+flutter: 📤 ========== BATCH THRESHOLD REACHED ==========
+flutter: 📤 Batch ready - sending 25 points to server
+flutter: 🌐 ========== SENDING BATCH TO SERVER ==========
+flutter: 👤 User ID: a690d93c-a03a-4856-bd4e-487d8c1d58a1
+flutter: 🚗 Trip ID: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953
+flutter: 📦 Batch number: 1
+flutter: 🚀 Background: Sending batch #1 with 25 deltas
+flutter: 📊 Batch data size: 7212 bytes
+flutter: 🌐 Endpoint: https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/store-trajectory-batch
+flutter: 📡 Making HTTP POST request...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📡 Response received: Status 200
+flutter: ✅ ========== BATCH UPLOADED SUCCESSFULLY ==========
+flutter: ✅ Background: Batch #1 uploaded successfully
+flutter: ✅ Response body: {"message": "Bulletproof trajectory batch stored successfully", "batch_id": "trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953_batch_1", "deltas_count": 25, "original_deltas_count": 25, "acceptance_rate": "100.0%", "enhancement_level": "high", "quality_score": 0.8, "batch_statistics": {"total_deltas": 25, "enhanced_deltas": 25, "average_speed": 0.0, "average_confidence": 0.9499999999999996, "average_gps_accuracy": 11.300598139593923, "stationary_points": 25, "high_quality_points": 0, "movement_points": 0}, "quality_issues_count": 25, "movement_detected": false, "validation_method": "bulletproof_with_safe_conversion"}
+flutter: 🌐 ========== BATCH SEND COMPLETE ==========
+flutter: 📤 Batch sent successfully, buffer cleared
+flutter: 📍 ========== LOCATION EVENT #25 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:05:15.046188Z
+flutter: 📍 ========== LOCATION EVENT #25 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:05:15.046558
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ✅ Point #26 - Delta: (25456, 71442), Time: 2002ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 1 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #26 END ==========
+flutter: 📱 Stopping mobile foreground service
+flutter: Background service destroyed
+flutter: 📊 Finalizing trip: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953 with 0 points
+flutter: ✅ Trip finalized successfully
+

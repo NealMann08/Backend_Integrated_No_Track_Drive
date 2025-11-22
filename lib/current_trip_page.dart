@@ -112,12 +112,41 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         allowWifiLock: true,
       ),
     );
+
+    // CRITICAL FOR iOS: Set up callback to receive data from background isolate
+    // On iOS, SharedPreferences doesn't sync across isolates, so we use SendPort/ReceivePort
+    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
+    print("✅ Foreground task data callback registered - ready to receive updates from background isolate");
+  }
+
+  // Callback to receive data from background isolate via SendPort
+  void _onReceiveTaskData(dynamic data) {
+    print("📥 Received data from background isolate: $data");
+
+    if (data is Map) {
+      setState(() {
+        if (data.containsKey('point_counter')) {
+          _pointCounter = data['point_counter'] as int;
+          print("📊 UI Updated - Point counter: $_pointCounter");
+        }
+        if (data.containsKey('current_speed')) {
+          currentSpeed = (data['current_speed'] as num).toDouble();
+          print("📊 UI Updated - Current speed: ${currentSpeed.toStringAsFixed(1)} mph");
+        }
+        if (data.containsKey('max_speed')) {
+          maxSpeed = (data['max_speed'] as num).toDouble();
+          print("📊 UI Updated - Max speed: ${maxSpeed.toStringAsFixed(1)} mph");
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
     _elapsedTimeTimer?.cancel();
     _speedUpdateTimer?.cancel();
+    // Remove the callback to prevent memory leaks
+    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
     super.dispose();
   }
 

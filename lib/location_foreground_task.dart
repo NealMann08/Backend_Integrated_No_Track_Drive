@@ -207,6 +207,20 @@ class LocationTaskHandler extends TaskHandler {
               print("🏁 New max speed: ${speedMph.toStringAsFixed(1)} mph");
             }
 
+            // CRITICAL FOR iOS: Send data to UI isolate via SendPort
+            // On iOS, SharedPreferences doesn't sync across isolates, so we must use SendPort
+            if (sendPort != null) {
+              sendPort.send({
+                'point_counter': _counter,
+                'current_speed': speedMph,
+                'max_speed': storedMaxSpeed > speedMph ? storedMaxSpeed : speedMph,
+                'timestamp': DateTime.now().toIso8601String(),
+              });
+              print("📡 Sent data to UI via SendPort - Points: $_counter, Speed: ${speedMph.toStringAsFixed(1)} mph");
+            } else {
+              print("⚠️ WARNING: SendPort is null - UI may not update on iOS!");
+            }
+
             print("✅ Point #$_counter - Delta: ($deltaLat, $deltaLon), Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${storedMaxSpeed > speedMph ? storedMaxSpeed.toStringAsFixed(1) : speedMph.toStringAsFixed(1)} mph");
             print("📊 Current buffer size: ${_deltaPoints.length} points (will send at 25)");
 
