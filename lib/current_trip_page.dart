@@ -113,10 +113,11 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       ),
     );
 
-    // CRITICAL FOR iOS: Set up callback to receive data from background isolate
-    // On iOS, SharedPreferences doesn't sync across isolates, so we use SendPort/ReceivePort
-    FlutterForegroundTask.addTaskDataCallback(_onReceiveTaskData);
-    print("✅ Foreground task data callback registered - ready to receive updates from background isolate");
+    // CRITICAL FOR iOS: Set up ReceivePort to receive data from background isolate
+    // On iOS, we must use ReceivePort.listen() not addTaskDataCallback()
+    print("✅ Setting up ReceivePort listener for background isolate data...");
+    FlutterForegroundTask.receivePort.listen(_onReceiveTaskData);
+    print("✅ ReceivePort listener registered - ready to receive updates from background isolate");
   }
 
   // Callback to receive data from background isolate via SendPort
@@ -176,8 +177,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   void dispose() {
     _elapsedTimeTimer?.cancel();
     _speedUpdateTimer?.cancel();
-    // Remove the callback to prevent memory leaks
-    FlutterForegroundTask.removeTaskDataCallback(_onReceiveTaskData);
+    // Note: ReceivePort listener is automatically cleaned up by flutter_foreground_task
     super.dispose();
   }
 
