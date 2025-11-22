@@ -116,8 +116,14 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     // CRITICAL FOR iOS: Set up ReceivePort to receive data from background isolate
     // On iOS, we must use ReceivePort.listen() not addTaskDataCallback()
     print("✅ Setting up ReceivePort listener for background isolate data...");
-    FlutterForegroundTask.receivePort.listen(_onReceiveTaskData);
-    print("✅ ReceivePort listener registered - ready to receive updates from background isolate");
+    final receivePort = FlutterForegroundTask.receivePort;
+    if (receivePort != null) {
+      receivePort.listen(_onReceiveTaskData);
+      print("✅ ReceivePort listener registered - ready to receive updates from background isolate");
+    } else {
+      print("❌ WARNING: ReceivePort is null - cannot set up listener!");
+      print("❌ UI updates from background isolate will NOT work!");
+    }
   }
 
   // Callback to receive data from background isolate via SendPort
