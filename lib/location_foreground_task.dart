@@ -133,16 +133,27 @@ class LocationTaskHandler extends TaskHandler {
             int deltaTimeMs = _lastPointTime != null ?
                 now.difference(_lastPointTime!).inMilliseconds : 1000;
 
-            // Get base point coordinates
+            // Get base point coordinates (from user's zipcode lookup via Zippopotam API)
             double baseLat = (_basePoint!['latitude'] ?? 0.0).toDouble();
             double baseLon = (_basePoint!['longitude'] ?? 0.0).toDouble();
 
-            // PRIVACY: Do not log base coordinates
+            // DEBUG: Log base point info (without exposing exact coordinates for privacy)
+            print("📐 ========== DELTA CALCULATION DEBUG ==========");
             print("📐 Base point loaded from user data");
-            
-            // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point)
+            print("📐 Base point source: ${_basePoint!['source'] ?? 'unknown'}");
+            print("📐 Base point city: ${_basePoint!['city'] ?? 'unknown'}");
+            print("📐 Base point zipcode: ${_basePoint!['zipcode'] ?? 'unknown'}");
+            print("📐 Current GPS accuracy: ${position.accuracy}m");
+
+            // Calculate deltas relative to base point (multiply by 1,000,000 for fixed-point integer precision)
+            // This ensures privacy: only the delta (change) is stored, not absolute GPS coordinates
+            // Backend can reconstruct the route by adding deltas to the base point
             int deltaLat = ((position.latitude - baseLat) * 1000000).round();
             int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+
+            print("📐 Delta calculation: (current_lat - base_lat) * 1000000 = $deltaLat");
+            print("📐 Delta calculation: (current_lon - base_lon) * 1000000 = $deltaLon");
+            print("📐 ========== DELTA CALCULATION COMPLETE ==========");
             
             // Calculate speed with improved logic
             double speedMph = 0.0;
@@ -207,18 +218,34 @@ class LocationTaskHandler extends TaskHandler {
               print("🏁 New max speed: ${speedMph.toStringAsFixed(1)} mph");
             }
 
-            // CRITICAL FOR iOS: Send data to UI isolate via SendPort
-            // On iOS, SharedPreferences doesn't sync across isolates, so we must use SendPort
-            if (sendPort != null) {
-              sendPort.send({
+            // CRITICAL FOR iOS: Send data to UI isolate
+            // On iOS, SharedPreferences doesn't sync across isolates
+            // Use FlutterForegroundTask.sendDataToMain() to send data to the UI
+            print("📡 ========== SENDING DATA TO UI ISOLATE ==========");
+            print("📡 Attempting to send data to main UI isolate...");
+            print("📡 Data to send:");
+            print("   - Point counter: $_counter");
+            print("   - Current speed: ${speedMph.toStringAsFixed(1)} mph");
+            print("   - Max speed: ${storedMaxSpeed > speedMph ? storedMaxSpeed.toStringAsFixed(1) : speedMph.toStringAsFixed(1)} mph");
+
+            try {
+              final dataPacket = {
                 'point_counter': _counter,
                 'current_speed': speedMph,
                 'max_speed': storedMaxSpeed > speedMph ? storedMaxSpeed : speedMph,
                 'timestamp': DateTime.now().toIso8601String(),
-              });
-              print("📡 Sent data to UI via SendPort - Points: $_counter, Speed: ${speedMph.toStringAsFixed(1)} mph");
-            } else {
-              print("⚠️ WARNING: SendPort is null - UI may not update on iOS!");
+              };
+
+              FlutterForegroundTask.sendDataToMain(dataPacket);
+              print("✅ Successfully called sendDataToMain()");
+              print("📡 Data packet sent: $dataPacket");
+              print("📡 ========== DATA SEND COMPLETE ==========");
+            } catch (e, stackTrace) {
+              print("❌ ========== DATA SEND FAILED ==========");
+              print("❌ Failed to send data to UI: $e");
+              print("❌ Stack trace: $stackTrace");
+              print("❌ This means the UI will NOT update!");
+              print("❌ ========== DATA SEND ERROR END ==========");
             }
 
             print("✅ Point #$_counter - Delta: ($deltaLat, $deltaLon), Time: ${deltaTimeMs}ms, Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${storedMaxSpeed > speedMph ? storedMaxSpeed.toStringAsFixed(1) : speedMph.toStringAsFixed(1)} mph");
@@ -261,6 +288,11 @@ class LocationTaskHandler extends TaskHandler {
 
     Future<void> _sendToServer() async {
     print("🌐 ========== SENDING BATCH TO SERVER ==========");
+    print("🌐 DELTA COORDINATE PRIVACY SYSTEM:");
+    print("   - Only deltas (changes) are sent to backend, NOT absolute GPS coordinates");
+    print("   - Backend stores deltas in database");
+    print("   - Backend can reconstruct trip by adding deltas to user's base point");
+    print("   - User's base point (from zipcode) is NEVER sent over network");
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? userDataJson = prefs.getString('user_data');
@@ -289,27 +321,51 @@ class LocationTaskHandler extends TaskHandler {
     batchNumber++;
     await prefs.setInt('batch_counter', batchNumber);
     print("📦 Batch number: $batchNumber");
-    
+    print("📦 This batch contains ${_deltaPoints.length} delta points");
+    print("📦 Each batch is numbered sequentially for proper trip reconstruction");
+
     // Transform delta points to match backend format
+    // IMPORTANT: Delta points contain ONLY the change from base point, not absolute coordinates
+    print("📐 ========== BATCH DELTA COMPOSITION ==========");
+    print("📐 Converting ${_deltaPoints.length} points to backend format");
+
     List<Map<String, dynamic>> deltas = [];
     for (int i = 0; i < _deltaPoints.length; i++) {
       var point = _deltaPoints[i];
-      
+
       deltas.add({
-        'delta_lat': point['dlat'],        // Already in fixed-point integer
-        'delta_long': point['dlon'],       // Already in fixed-point integer
-        'delta_time': point['dt'].toDouble(), // Convert to double for backend
-        'timestamp': point['t'],
-        'sequence': point['p'],
-        'speed_mph': point['speed_mph'],
-        'speed_source': point['speed_source'] ?? 'calculated',  // NEW: Track speed source
+        'delta_lat': point['dlat'],        // Fixed-point integer (actual_lat - base_lat) * 1000000
+        'delta_long': point['dlon'],       // Fixed-point integer (actual_lon - base_lon) * 1000000
+        'delta_time': point['dt'].toDouble(), // Time since last point in milliseconds
+        'timestamp': point['t'],           // ISO8601 timestamp
+        'sequence': point['p'],            // Sequence number within trip
+        'speed_mph': point['speed_mph'],   // Speed in miles per hour
+        'speed_source': point['speed_source'] ?? 'calculated',  // 'gps' or 'calculated'
         'speed_confidence': point['speed_source'] == 'gps' ? 0.95 : 0.7,
-        'gps_accuracy': point['accuracy'] ?? 5.0,
-        'is_stationary': point['speed_mph'] < 2.0,
+        'gps_accuracy': point['accuracy'] ?? 5.0,  // GPS accuracy in meters
+        'is_stationary': point['speed_mph'] < 2.0, // Is user stationary?
         'data_quality': point['accuracy'] != null && point['accuracy'] < 10 ? 'high' : 'medium',
-        'raw_speed_ms': point['gps_speed']
+        'raw_speed_ms': point['gps_speed'] // Raw GPS speed in m/s (can be null)
       });
+
+      // Log first and last point for verification
+      if (i == 0) {
+        print("📐 First point in batch:");
+        print("   - Sequence: ${point['p']}");
+        print("   - Delta lat: ${point['dlat']} (fixed-point)");
+        print("   - Delta lon: ${point['dlon']} (fixed-point)");
+        print("   - Speed: ${point['speed_mph'].toStringAsFixed(1)} mph");
+      }
+      if (i == _deltaPoints.length - 1) {
+        print("📐 Last point in batch:");
+        print("   - Sequence: ${point['p']}");
+        print("   - Delta lat: ${point['dlat']} (fixed-point)");
+        print("   - Delta lon: ${point['dlon']} (fixed-point)");
+        print("   - Speed: ${point['speed_mph'].toStringAsFixed(1)} mph");
+      }
     }
+
+    print("📐 ========== DELTA BATCH READY FOR TRANSMISSION ==========");
     
     // Prepare batch data matching your backend format
     Map<String, dynamic> data = {

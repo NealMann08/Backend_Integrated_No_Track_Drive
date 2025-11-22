@@ -121,23 +121,54 @@ class CurrentTripPageState extends State<CurrentTripPage> {
 
   // Callback to receive data from background isolate via SendPort
   void _onReceiveTaskData(dynamic data) {
-    print("📥 Received data from background isolate: $data");
+    print("📥 ========== UI RECEIVED DATA FROM BACKGROUND ISOLATE ==========");
+    print("📥 Raw data type: ${data.runtimeType}");
+    print("📥 Raw data content: $data");
+
+    if (data == null) {
+      print("❌ ERROR: Received null data from background isolate!");
+      print("📥 ========== DATA RECEIVE END (NULL) ==========");
+      return;
+    }
 
     if (data is Map) {
+      print("✅ Data is a Map - proceeding to update UI");
+      print("📥 Map keys: ${data.keys.toList()}");
+
       setState(() {
         if (data.containsKey('point_counter')) {
-          _pointCounter = data['point_counter'] as int;
-          print("📊 UI Updated - Point counter: $_pointCounter");
+          int newCounter = data['point_counter'] as int;
+          print("📊 Updating point counter: $_pointCounter -> $newCounter");
+          _pointCounter = newCounter;
+          print("✅ Point counter updated successfully: $_pointCounter");
+        } else {
+          print("⚠️ WARNING: point_counter key not found in data");
         }
+
         if (data.containsKey('current_speed')) {
-          currentSpeed = (data['current_speed'] as num).toDouble();
-          print("📊 UI Updated - Current speed: ${currentSpeed.toStringAsFixed(1)} mph");
+          double newSpeed = (data['current_speed'] as num).toDouble();
+          print("📊 Updating current speed: ${currentSpeed.toStringAsFixed(1)} -> ${newSpeed.toStringAsFixed(1)} mph");
+          currentSpeed = newSpeed;
+          print("✅ Current speed updated successfully: ${currentSpeed.toStringAsFixed(1)} mph");
+        } else {
+          print("⚠️ WARNING: current_speed key not found in data");
         }
+
         if (data.containsKey('max_speed')) {
-          maxSpeed = (data['max_speed'] as num).toDouble();
-          print("📊 UI Updated - Max speed: ${maxSpeed.toStringAsFixed(1)} mph");
+          double newMaxSpeed = (data['max_speed'] as num).toDouble();
+          print("📊 Updating max speed: ${maxSpeed.toStringAsFixed(1)} -> ${newMaxSpeed.toStringAsFixed(1)} mph");
+          maxSpeed = newMaxSpeed;
+          print("✅ Max speed updated successfully: ${maxSpeed.toStringAsFixed(1)} mph");
+        } else {
+          print("⚠️ WARNING: max_speed key not found in data");
         }
       });
+
+      print("✅ setState() called - UI should rebuild now");
+      print("📥 ========== UI UPDATE COMPLETE ==========");
+    } else {
+      print("❌ ERROR: Data is not a Map! Type: ${data.runtimeType}");
+      print("📥 ========== DATA RECEIVE END (WRONG TYPE) ==========");
     }
   }
 

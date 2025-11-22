@@ -1208,3 +1208,134 @@ flutter: Background service destroyed
 flutter: 📊 Finalizing trip: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763773462953 with 0 points
 flutter: ✅ Trip finalized successfully
 
+# NOV 21 - Part 2: Seems to not work still:
+
+flutter: Sending login request: {email: nov21@gmail.com, password: Winter@1, mode: signin}
+flutter: Auth response received: Login successful
+flutter: Login mode: true, Backend role: driver, Final navigation role: user
+flutter: ✅ New trip started: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763774708885_424709
+flutter: Base point: Dublin, CA
+flutter: ✅ Foreground task data callback registered - ready to receive updates from background isolate
+flutter: Location permission granted.
+flutter: ✅ Location permission validated for platform
+flutter:    Platform: Mobile
+flutter:    Permission level: LocationPermission.always
+flutter: ✅ Created trip: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763774710181
+flutter: 📱 Mobile platform detected - using foreground service
+flutter: 🚀 ========== STARTING FOREGROUND SERVICE ==========
+flutter: 📱 Platform: Mobile (Android/iOS)
+flutter: 🚗 Trip ID: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763774710181
+flutter: ========== FOREGROUND TASK STARTING ==========
+flutter: 🚀 onStart called at: 2025-11-22T01:25:10.256484Z
+flutter: 📦 Loading user base point for delta calculations...
+flutter: 📊 Service start result: Instance of 'ServiceRequestSuccess'
+flutter: ✅ User data found in SharedPreferences
+flutter: 👤 User ID: a690d93c-a03a-4856-bd4e-487d8c1d58a1
+flutter: ✅ Base point loaded: Dublin, CA
+flutter: ✅ Base point has latitude: true
+flutter: ✅ Base point has longitude: true
+flutter: ✅ Base point coordinates loaded for delta calculations
+flutter: ⏰ Last point time initialized: 2025-11-21T17:25:10.258379
+flutter: 📍 Current location permission: LocationPermission.always
+flutter: ✅ 'Always' location permission confirmed - background tracking enabled
+flutter: ✅ Location services are enabled on device
+flutter: ✅ Active trip ID found: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763774710181
+flutter: ========== FOREGROUND TASK STARTED SUCCESSFULLY ==========
+flutter: 🔄 Event loop will trigger every 2 seconds
+flutter: 🛰️ GPS tracking is now active
+flutter: 🔍 Checking if service is running: true
+flutter: 📊 Service successfully started: true
+flutter: ✅ ========== FOREGROUND SERVICE STARTED SUCCESSFULLY ==========
+flutter: ✅ Background location tracking is ACTIVE
+flutter: ✅ GPS polling will occur every 2 seconds
+flutter: ✅ Check console for location events
+flutter: ✅ Look for messages like "REPEAT EVENT TRIGGERED"
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:12.265325Z
+flutter: 📍 ========== LOCATION EVENT #0 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:12.265614
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 8.557381875721157m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #1 - Delta: (25456, 71535), Time: 2050ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 1 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #1 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:14.265533Z
+flutter: 📍 ========== LOCATION EVENT #1 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:14.265928
+flutter: 🛰️ Requesting GPS position...
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #2 - Delta: (25456, 71442), Time: 1967ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 2 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #2 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:16.265027Z
+flutter: 📍 ========== LOCATION EVENT #2 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:16.265234
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #3 - Delta: (25456, 71442), Time: 2004ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 3 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #3 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:18.265268Z
+flutter: 📍 ========== LOCATION EVENT #3 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:18.265494
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #4 - Delta: (25456, 71442), Time: 1998ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 4 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #4 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:20.264677Z
+flutter: 📍 ========== LOCATION EVENT #4 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:20.264942
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #5 - Delta: (25456, 71442), Time: 1997ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 5 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #5 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 🔄 REPEAT EVENT TRIGGERED - Event loop is running! Time: 2025-11-22T01:25:22.264692Z
+flutter: 📍 ========== LOCATION EVENT #5 START ==========
+flutter: 📍 Location event triggered at 2025-11-21T17:25:22.264888
+flutter: 🛰️ Requesting GPS position...
+flutter: ✅ Got GPS position with accuracy: 11.300598139593928m
+flutter: ✅ GPS speed provided: 0.0 m/s
+flutter: 📐 Base point loaded from user data
+flutter: 📊 Using GPS speed: 0.0 mph (0.00 m/s)
+flutter: ⚠️ WARNING: SendPort is null - UI may not update on iOS!
+flutter: ✅ Point #6 - Delta: (25456, 71442), Time: 2003ms, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📊 Current buffer size: 6 points (will send at 25)
+flutter: 📍 ========== LOCATION EVENT #6 END ==========
+flutter: 📱 UI Update Check - Points: 0, Speed: 0.0 mph, Max: 0.0 mph
+flutter: 📱 Stopping mobile foreground service
+flutter: Background service destroyed
+flutter: 📊 Finalizing trip: trip_a690d93c-a03a-4856-bd4e-487d8c1d58a1_1763774710181 with 0 points
+flutter: ✅ Trip finalized successfully
+
