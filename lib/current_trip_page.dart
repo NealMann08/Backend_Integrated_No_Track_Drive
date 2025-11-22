@@ -113,17 +113,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       ),
     );
 
-    // CRITICAL FOR iOS: Set up ReceivePort to receive data from background isolate
-    // On iOS, we must use ReceivePort.listen() not addTaskDataCallback()
-    print("✅ Setting up ReceivePort listener for background isolate data...");
-    final receivePort = FlutterForegroundTask.receivePort;
-    if (receivePort != null) {
-      receivePort.listen(_onReceiveTaskData);
-      print("✅ ReceivePort listener registered - ready to receive updates from background isolate");
-    } else {
-      print("❌ WARNING: ReceivePort is null - cannot set up listener!");
-      print("❌ UI updates from background isolate will NOT work!");
-    }
+    // Note: ReceivePort listener will be set up AFTER service starts
+    // (ReceivePort doesn't exist until service is running)
   }
 
   // Callback to receive data from background isolate via SendPort
@@ -614,7 +605,25 @@ class CurrentTripPageState extends State<CurrentTripPage> {
           print('✅ GPS polling will occur every 2 seconds');
           print('✅ Check console for location events');
           print('✅ Look for messages like "REPEAT EVENT TRIGGERED"');
-          
+
+          // CRITICAL FOR iOS: Set up ReceivePort listener AFTER service starts
+          // The ReceivePort is only created when the service starts, so we must do this here
+          print('📡 ========== SETTING UP RECEIVEPORT LISTENER ==========');
+          print('📡 Service is running - ReceivePort should now exist');
+
+          final receivePort = FlutterForegroundTask.receivePort;
+          if (receivePort != null) {
+            print('✅ ReceivePort found - setting up listener...');
+            receivePort.listen(_onReceiveTaskData);
+            print('✅ ReceivePort listener registered successfully!');
+            print('✅ UI will now receive real-time updates from background isolate');
+          } else {
+            print('❌ CRITICAL ERROR: ReceivePort is STILL null even after service started!');
+            print('❌ This is unexpected - UI updates will NOT work!');
+            print('❌ This may be a flutter_foreground_task iOS bug');
+          }
+          print('📡 ========== RECEIVEPORT SETUP COMPLETE ==========');
+
           // Timer to read speed data from background service - runs every 1 second
           _speedUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
             if (!mounted || !isTripStarted) {
