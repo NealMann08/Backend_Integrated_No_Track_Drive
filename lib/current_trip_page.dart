@@ -576,131 +576,108 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         );
         
       } else {
-        // MOBILE PLATFORM: Use foreground service
-        print('📱 Mobile platform detected - using foreground service');
+        // MOBILE PLATFORM: Use simple timer GPS (same as web - IT WORKS!)
+        print('📱 Mobile platform - using timer GPS tracking (like web)');
         
-        // Start the foreground service for mobile
-        print('🚀 ========== STARTING FOREGROUND SERVICE ==========');
-        print('📱 Platform: Mobile (Android/iOS)');
-        print('🚗 Trip ID: $tripId');
+        // Get user data for batch sending
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        String? userDataJson = prefs.getString('user_data');
+        String userId = '';
+        if (userDataJson != null) {
+          Map<String, dynamic> userData = json.decode(userDataJson);
+          userId = userData['user_id'] ?? '';
+        }
 
-        ServiceRequestResult result = await FlutterForegroundTask.startService(
-          notificationTitle: 'Trip in Progress',
-          notificationText: 'Tracking your location',
-          callback: startCallback,
-        );
-
-        print('📊 Service start result: $result');
-
-        // Verify service is running
-        await Future.delayed(Duration(milliseconds: 1000));
-
-        bool isServiceRunning = await FlutterForegroundTask.isRunningService;
-        print('🔍 Checking if service is running: $isServiceRunning');
-        print('📊 Service successfully started: $isServiceRunning');
-
-        if (isServiceRunning) {
-          print('✅ ========== FOREGROUND SERVICE STARTED SUCCESSFULLY ==========');
-          print('✅ Background location tracking is ACTIVE');
-          print('✅ GPS polling will occur every 2 seconds');
-          print('✅ Check console for location events');
-          print('✅ Look for messages like "REPEAT EVENT TRIGGERED"');
-
-          // CRITICAL FOR iOS: Set up ReceivePort listener AFTER service starts
-          // The ReceivePort is only created when the service starts, so we must do this here
-          print('📡 ========== SETTING UP RECEIVEPORT LISTENER ==========');
-          print('📡 Service is running - ReceivePort should now exist');
-
-          final receivePort = FlutterForegroundTask.receivePort;
-          if (receivePort != null) {
-            print('✅ ReceivePort found - setting up listener...');
-            receivePort.listen(_onReceiveTaskData);
-            print('✅ ReceivePort listener registered successfully!');
-            print('✅ UI will now receive real-time updates from background isolate');
-          } else {
-            print('❌ CRITICAL ERROR: ReceivePort is STILL null even after service started!');
-            print('❌ This is unexpected - UI updates will NOT work!');
-            print('❌ This may be a flutter_foreground_task iOS bug');
+        // Start GPS polling timer - every 2 seconds (SAME AS WEB - IT WORKS!)
+        _speedUpdateTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
+          if (!mounted || !isTripStarted) {
+            timer.cancel();
+            return;
           }
-          print('📡 ========== RECEIVEPORT SETUP COMPLETE ==========');
 
-          // Timer to read speed data from background service - runs every 1 second
-          _speedUpdateTimer = Timer.periodic(Duration(seconds: 1), (timer) async {
-            if (!mounted || !isTripStarted) {
-              timer.cancel();
-              return;
+          print('📱 ========== MOBILE GPS POLL #$_pointCounter ==========');
+
+          try {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.bestForNavigation,
+            ).timeout(Duration(seconds: 5));
+
+            print('✅ GPS: Accuracy ${position.accuracy}m');
+
+            // Calculate speed (same as web)
+            double speedMph = 0.0;
+            bool usedGpsSpeed = false;
+
+            if (position.speed != null && position.speed! >= 0) {
+              speedMph = position.speed! * 2.237;
+              usedGpsSpeed = true;
+            } else if (lastPosition != null) {
+              double distanceMeters = Geolocator.distanceBetween(
+                lastPosition!.latitude, lastPosition!.longitude,
+                position.latitude, position.longitude,
+              );
+              double distanceMiles = distanceMeters * 0.000621371;
+              double timeHours = 2.0 / 3600.0;
+              if (distanceMeters > 0.5) {
+                speedMph = distanceMiles / timeHours;
+              }
             }
 
-            try {
-              SharedPreferences prefs = await SharedPreferences.getInstance();
+            if (speedMph > 150) speedMph = currentSpeed;
 
-              // Read all metrics from background service
-              double? storedMaxSpeed = prefs.getDouble('max_speed');
-              double? storedCurrentSpeed = prefs.getDouble('current_speed');
-              int? storedPointCounter = prefs.getInt('point_counter');
+            // UPDATE UI - THIS WORKS! (same as web)
+            setState(() {
+              currentSpeed = speedMph;
+              if (speedMph > maxSpeed) maxSpeed = speedMph;
+              _pointCounter++;
+            });
 
-              // Debug logging
-              // Always log UI update attempts
-              print('📱 UI Update Check - Points: ${storedPointCounter ?? 0}, Speed: ${storedCurrentSpeed?.toStringAsFixed(1) ?? "0.0"} mph, Max: ${storedMaxSpeed?.toStringAsFixed(1) ?? "0.0"} mph');
+            lastPosition = position;
 
-              if (storedPointCounter == null || storedPointCounter == 0) {
-                // No data yet - check if service is still running
-                bool stillRunning = await FlutterForegroundTask.isRunningService;
-                if (!stillRunning) {
-                  print('❌ CRITICAL: Foreground service has stopped running!');
-                  print('❌ Location tracking is NOT active');
+            // Calculate and store deltas
+            if (userDataJson != null) {
+              Map<String, dynamic> userData = json.decode(userDataJson);
+              if (userData['base_point'] != null) {
+                double baseLat = (userData['base_point']['latitude'] ?? 0.0).toDouble();
+                double baseLon = (userData['base_point']['longitude'] ?? 0.0).toDouble();
+
+                int deltaLat = ((position.latitude - baseLat) * 1000000).round();
+                int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+
+                _webDeltaPoints.add({
+                  'dlat': deltaLat,
+                  'dlon': deltaLon,
+                  'dt': 2000,
+                  't': DateTime.now().toIso8601String(),
+                  'p': _pointCounter,
+                  'speed_mph': speedMph,
+                  'accuracy': position.accuracy,
+                  'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
+                });
+
+                print('📊 Point #$_pointCounter - Delta: ($deltaLat, $deltaLon), Speed: ${speedMph.toStringAsFixed(1)} mph');
+                print('📊 Buffer: ${_webDeltaPoints.length}/25 points');
+
+                // Send batch at 25 points
+                if (_webDeltaPoints.length >= 25) {
+                  print('📤 Batch ready - sending to server');
+                  await _sendWebBatchToServer(prefs, userId, tripId);
                 }
               }
-
-              // Update UI state
-              setState(() {
-                if (storedMaxSpeed != null) {
-                  maxSpeed = storedMaxSpeed;
-                }
-
-                if (storedCurrentSpeed != null) {
-                  currentSpeed = storedCurrentSpeed;
-                }
-
-                if (storedPointCounter != null) {
-                  _pointCounter = storedPointCounter;
-                }
-              });
-            } catch (e) {
-              print('❌ Error reading trip data from SharedPreferences: $e');
             }
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Trip started! Background tracking active.'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          print('❌ ========== FOREGROUND SERVICE FAILED TO START ==========');
-          print('❌ Service start result was: $result');
-          print('❌ Service running check returned: false');
-          print('❌ Possible reasons:');
-          print('   1. Location permissions not granted');
-          print('   2. Battery optimization blocking background service');
-          print('   3. Platform-specific restrictions');
-          print('   4. Foreground service not properly configured');
 
-          setState(() {
-            isTripStarted = false;
-            _elapsedTime = 0;
-          });
+          } catch (e) {
+            print('❌ GPS error: $e');
+          }
+        });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to start location tracking. Please check permissions and try again.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Trip started! GPS tracking active.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } else {
       print('❌ Invalid location permission: $permission');
