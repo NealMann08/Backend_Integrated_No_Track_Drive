@@ -109,23 +109,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   /// Builds the navigation items for insurance users
+  /// Insurance providers only have Dashboard and Settings
   List<BottomNavigationBarItem> _buildInsuranceNavItems() {
     return [
       BottomNavigationBarItem(
-        icon: Icon(Icons.person_search),
-        label: 'Lookup',
+        icon: Icon(Icons.dashboard),
+        label: 'Dashboard',
       ),
       BottomNavigationBarItem(
-        icon: Icon(Icons.history),
-        label: 'Trips',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.score),
-        label: 'Scores',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.account_circle),
-        label: 'Account',
+        icon: Icon(Icons.settings),
+        label: 'Settings',
       ),
     ];
   }
@@ -157,18 +150,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     Widget page;
     
     if (role == 'insurance') {
+      // Insurance users only have Dashboard and Settings
       switch (index) {
         case 0:
-          page = HomePage(role: role);
+          page = HomePage(role: role);  // Dashboard (Insurance Home Page)
           break;
         case 1:
-          page = SettingsPage();
-          break;
-        case 2:
-          page = SettingsPage();
-          break;
-        case 3:
-          page = SettingsPage();
+          page = SettingsPage();  // Settings
           break;
         default:
           return;

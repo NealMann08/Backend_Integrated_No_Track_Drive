@@ -478,7 +478,8 @@ void _selectUser(Map<String, dynamic> user) {
         (analytics['trips'] as List?)?.fold(0, (sum, trip) => sum + ((trip['dangerous_turns'] ?? 0) as int)) ?? 0;
       
       // Set the trips data
-      _userTrips = (analytics['trips'] as List? ?? []).map((trip) => {
+      List<dynamic> rawTrips = analytics['trips'] as List? ?? [];
+      List<Map<String, dynamic>> mappedTrips = rawTrips.map((trip) => {
         'trip_id': trip['trip_id'],
         'start_time': trip['start_timestamp'],
         'end_time': trip['end_timestamp'],
@@ -494,6 +495,27 @@ void _selectUser(Map<String, dynamic> user) {
         'safe_turns': trip['safe_turns'] ?? 0,
         'aggressive_turns': trip['aggressive_turns'] ?? 0,
       }).toList();
+
+      // Apply initial sorting based on current sort option
+      if (_tripSortOption == 'recent') {
+        mappedTrips.sort((a, b) {
+          try {
+            final aTime = DateTime.parse(a['end_time'] ?? '');
+            final bTime = DateTime.parse(b['end_time'] ?? '');
+            return bTime.compareTo(aTime); // Newest first
+          } catch (e) {
+            return 0;
+          }
+        });
+      } else if (_tripSortOption == 'distance') {
+        mappedTrips.sort((a, b) {
+          final aDistance = (a['distance'] ?? 0).toDouble();
+          final bDistance = (b['distance'] ?? 0).toDouble();
+          return bDistance.compareTo(aDistance); // Longest first
+        });
+      }
+
+      _userTrips = mappedTrips;
       
       _isLoadingScore = false;
       _isLoadingTrips = false;
@@ -1602,9 +1624,24 @@ Future<void> _searchForUsers() async {
     }
   } catch (e) {
     print('Search error: $e');
+    String errorMessage = 'Search failed: ';
+
+    // Provide specific error messages based on the error type
+    if (e.toString().contains('Failed host lookup') || e.toString().contains('SocketException')) {
+      errorMessage += 'Network error. Please check your internet connection.';
+    } else if (e.toString().contains('TimeoutException')) {
+      errorMessage += 'Request timed out. Please try again.';
+    } else if (e.toString().contains('404') || e.toString().contains('Not Found')) {
+      errorMessage += 'No driver found with email: $_searchQuery';
+    } else if (_searchQuery.isEmpty || !_searchQuery.contains('@')) {
+      errorMessage += 'Please enter a valid email address';
+    } else {
+      errorMessage += 'Unable to search. Please try again or contact support.';
+    }
+
     setState(() {
       _isLoadingUsers = false;
-      _searchError = 'Search failed: Please enter a valid email address';
+      _searchError = errorMessage;
     });
   }
 }
@@ -1659,7 +1696,56 @@ Future<void> _loadUserTrips(String userId) async {
   });
 
   try {
-    final trips = await TripService.getUserTrips(userId, sortBy: _tripSortOption);
+    // Get trips from the already-loaded analytics data (from _searchForUsers)
+    List<Map<String, dynamic>> trips = [];
+
+    if (_foundUsers.isNotEmpty && _foundUsers[0]['analytics_data'] != null) {
+      final analyticsData = _foundUsers[0]['analytics_data'];
+      List<dynamic> rawTrips = analyticsData['trips'] ?? [];
+
+      // Map trips to expected format
+      trips = rawTrips.map((trip) => {
+        'trip_id': trip['trip_id'],
+        'start_time': trip['start_timestamp'],
+        'end_time': trip['end_timestamp'],
+        'distance': trip['total_distance_miles'] ?? 0,
+        'duration': trip['duration_minutes'] ?? 0,
+        'avg_speed': trip['avg_speed_mph'] ?? 0,
+        'max_speed': trip['max_speed_mph'] ?? 0,
+        'behavior_score': trip['behavior_score'] ?? 0,
+        'sudden_accelerations': trip['sudden_accelerations'] ?? 0,
+        'sudden_decelerations': trip['sudden_decelerations'] ?? 0,
+        'hard_stops': trip['hard_stops'] ?? 0,
+        'dangerous_turns': trip['dangerous_turns'] ?? 0,
+        'safe_turns': trip['safe_turns'] ?? 0,
+        'aggressive_turns': trip['aggressive_turns'] ?? 0,
+      } as Map<String, dynamic>).toList();
+
+      // Sort trips client-side based on _tripSortOption
+      if (_tripSortOption == 'recent') {
+        // Sort by end_time (most recent first)
+        trips.sort((a, b) {
+          try {
+            final aTime = DateTime.parse(a['end_time'] ?? '');
+            final bTime = DateTime.parse(b['end_time'] ?? '');
+            return bTime.compareTo(aTime); // Descending (newest first)
+          } catch (e) {
+            return 0;
+          }
+        });
+      } else if (_tripSortOption == 'distance') {
+        // Sort by distance (longest first)
+        trips.sort((a, b) {
+          final aDistance = (a['distance'] ?? 0).toDouble();
+          final bDistance = (b['distance'] ?? 0).toDouble();
+          return bDistance.compareTo(aDistance); // Descending (longest first)
+        });
+      }
+    } else {
+      // If no analytics data, fall back to API call (shouldn't happen but safe fallback)
+      trips = await TripService.getUserTrips(userId, sortBy: _tripSortOption);
+    }
+
     setState(() {
       _userTrips = trips;
       _isLoadingTrips = false;

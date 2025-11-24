@@ -251,23 +251,41 @@ static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
   int safeTurns = 0;
   
   try {
+    // 🔥 DEBUG: Log all timestamp-related fields
+    print("🔥 DEBUG showTripDetailsModal - Parsing trip data:");
+    print("  Trip ID: ${trip['trip_id']}");
+    print("  start_time: ${trip['start_time']} (type: ${trip['start_time']?.runtimeType})");
+    print("  end_time: ${trip['end_time']} (type: ${trip['end_time']?.runtimeType})");
+    print("  start_timestamp: ${trip['start_timestamp']} (type: ${trip['start_timestamp']?.runtimeType})");
+    print("  end_timestamp: ${trip['end_timestamp']} (type: ${trip['end_timestamp']?.runtimeType})");
+    print("  timestamp: ${trip['timestamp']} (type: ${trip['timestamp']?.runtimeType})");
+    print("  Available keys: ${trip.keys.toList()}");
+
     // Primary: Use insurance_home_page format (start_time, end_time, duration, avg_speed)
     if (trip['start_time'] != null) {
+      print("  Using start_time format...");
       startTime = DateTime.parse(trip['start_time']).toLocal();
-      endTime = trip['end_time'] != null 
+      endTime = trip['end_time'] != null
         ? DateTime.parse(trip['end_time']).toLocal()
         : startTime;
       duration = (trip['duration'] ?? 0).toDouble();
       avgSpeed = (trip['avg_speed'] ?? 0).toDouble();
       maxSpeed = (trip['max_speed'] ?? 0).toDouble();
       distance = (trip['distance'] ?? 0).toDouble();
+      print("  ✅ Parsed start_time successfully: $startTime");
     }
     // Fallback: Backend format (start_timestamp, end_timestamp, duration_minutes, avg_speed_mph)
     else if (trip['start_timestamp'] != null) {
+      print("  Using start_timestamp format...");
+      print("  Attempting to parse: ${trip['start_timestamp']}");
       startTime = DateTime.parse(trip['start_timestamp']).toLocal();
-      endTime = trip['end_timestamp'] != null 
+      print("  ✅ Parsed start_timestamp: $startTime");
+
+      endTime = trip['end_timestamp'] != null
         ? DateTime.parse(trip['end_timestamp']).toLocal()
         : startTime;
+      print("  ✅ Parsed end_timestamp: $endTime");
+
       duration = (trip['duration_minutes'] ?? 0).toDouble();
       avgSpeed = (trip['avg_speed_mph'] ?? 0).toDouble();
       maxSpeed = (trip['max_speed_mph'] ?? 0).toDouble();
@@ -275,6 +293,7 @@ static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
     }
     // Last resort: Ryan's format
     else if (trip['timestamp'] != null) {
+      print("  Using timestamp format...");
       if (trip['timestamp'] is String) {
         startTime = DateTime.parse(trip['timestamp']).toLocal();
       } else {
@@ -285,7 +304,9 @@ static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
       avgSpeed = (trip['average_speed'] ?? 0).toDouble();
       maxSpeed = (trip['max_speed'] ?? 0).toDouble();
       distance = (trip['distance'] ?? 0).toDouble();
+      print("  ✅ Parsed timestamp successfully: $startTime");
     } else {
+      print("  ❌ NO VALID TIMESTAMP FIELDS FOUND!");
       startTime = DateTime.now();
       endTime = DateTime.now();
       duration = 0.0;
@@ -301,8 +322,10 @@ static void showTripDetails(BuildContext context, Map<String, dynamic> trip) {
     dangerousTurns = (trip['dangerous_turns'] ?? 0) as int;
     safeTurns = (trip['safe_turns'] ?? 0) as int;
     
-  } catch (e) {
-    print("Error parsing trip data: $e");
+  } catch (e, stackTrace) {
+    print("❌ ERROR parsing trip data: $e");
+    print("❌ Stack trace: $stackTrace");
+    print("❌ Failed trip data: ${trip.toString()}");
     startTime = DateTime.now();
     endTime = DateTime.now();
     duration = 0.0;

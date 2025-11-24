@@ -176,7 +176,7 @@ class HomePageState extends State<HomePage> {
                 child: _buildRoleSpecificHomePage(isWeb),
               ),
             ),
-      bottomNavigationBar: isLoading || (isWeb && isAdminOrInsurance)
+      bottomNavigationBar: isLoading || isAdminOrInsurance
           ? null
           : CustomAppBar(
               selectedIndex: _selectedIndex,
