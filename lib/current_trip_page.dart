@@ -44,6 +44,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   int _selectedIndex = 0;
   double currentSpeed = 0.0;
   double maxSpeed = 0.0;
+  double _totalDistance = 0.0; // Real-time distance tracking in miles
+  int _batchCounter = 0; // Track number of batches uploaded
   Position? lastPosition;
   final List<Map<String, dynamic>> _webDeltaPoints = []; // Store delta points for web
   int _webBatchCounter = 0;
@@ -412,6 +414,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         isTripStarted = true;
         _elapsedTime = 0;
         _pointCounter = 0;
+        _totalDistance = 0.0; // Reset distance
+        _batchCounter = 0; // Reset batch counter
         tripStartTime = DateTime.now();
         currentSpeed = 0.0;
         maxSpeed = 0.0;
@@ -424,6 +428,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       await prefs.setDouble('max_speed', 0.0);
       await prefs.setInt('point_counter', 0);
       await prefs.setDouble('current_speed', 0.0);
+      await prefs.setDouble('total_distance', 0.0); // Store distance
       
       print('✅ Created trip: $tripId');
       
@@ -496,6 +501,23 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               print('⚠️ Web: Unrealistic speed capped');
             }
 
+            // Calculate distance from last position
+            double segmentDistance = 0.0;
+            if (lastPosition != null) {
+              double distanceMeters = Geolocator.distanceBetween(
+                lastPosition!.latitude,
+                lastPosition!.longitude,
+                position.latitude,
+                position.longitude,
+              );
+              segmentDistance = distanceMeters * 0.000621371; // Convert meters to miles
+
+              // Only add distance if movement is significant (filter GPS drift)
+              if (segmentDistance > 0.001) { // Minimum 5.3 feet
+                _totalDistance += segmentDistance;
+              }
+            }
+
             // Update state
             setState(() {
               currentSpeed = speedMph;
@@ -511,6 +533,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             await prefs.setDouble('current_speed', speedMph);
             await prefs.setDouble('max_speed', maxSpeed);
             await prefs.setInt('point_counter', _pointCounter);
+            await prefs.setDouble('total_distance', _totalDistance);
 
             // Calculate delta coordinates for web (same as mobile)
             String? userDataJson = prefs.getString('user_data');
@@ -541,6 +564,10 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                 if (_webDeltaPoints.length >= 25) {
                   print('📤 ========== WEB BATCH READY ==========');
                   await _sendWebBatchToServer(prefs, userId, tripId);
+                  setState(() {
+                    _batchCounter++;
+                  });
+                  await prefs.setInt('batch_counter', _batchCounter);
                 }
               }
             }
@@ -625,6 +652,21 @@ class CurrentTripPageState extends State<CurrentTripPage> {
 
             if (speedMph > 150) speedMph = currentSpeed;
 
+            // Calculate distance from last position (same as web)
+            double segmentDistance = 0.0;
+            if (lastPosition != null) {
+              double distanceMeters = Geolocator.distanceBetween(
+                lastPosition!.latitude, lastPosition!.longitude,
+                position.latitude, position.longitude,
+              );
+              segmentDistance = distanceMeters * 0.000621371; // Convert meters to miles
+
+              // Only add distance if movement is significant (filter GPS drift)
+              if (segmentDistance > 0.001) { // Minimum 5.3 feet
+                _totalDistance += segmentDistance;
+              }
+            }
+
             // UPDATE UI - THIS WORKS! (same as web)
             setState(() {
               currentSpeed = speedMph;
@@ -633,6 +675,9 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             });
 
             lastPosition = position;
+
+            // Save distance to SharedPreferences
+            await prefs.setDouble('total_distance', _totalDistance);
 
             // Calculate and store deltas
             if (userDataJson != null) {
@@ -662,6 +707,10 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                 if (_webDeltaPoints.length >= 25) {
                   print('📤 Batch ready - sending to server');
                   await _sendWebBatchToServer(prefs, userId, tripId);
+                  setState(() {
+                    _batchCounter++;
+                  });
+                  await prefs.setInt('batch_counter', _batchCounter);
                 }
               }
             }
@@ -734,6 +783,11 @@ class CurrentTripPageState extends State<CurrentTripPage> {
 
         print('📤 Sending final batch with ${_webDeltaPoints.length} remaining points');
         await _sendWebBatchToServer(prefs, userId, tripId);
+        // Increment batch counter for the final incomplete batch
+        setState(() {
+          _batchCounter++;
+        });
+        await prefs.setInt('batch_counter', _batchCounter);
       }
 
       print('🌐 Web tracking stopped');
@@ -788,7 +842,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
           'use_gps_metrics': true,
           'gps_max_speed_mph': maxSpeed,
           'actual_duration_minutes': durationMinutes,
-          'actual_distance_miles': (_pointCounter * 0.1), // Rough estimate
+          'actual_distance_miles': _totalDistance, // FIXED: Use accurate distance
           'total_points': _pointCounter,
           'valid_points': _pointCounter,
           'rejected_points': 0,
@@ -833,6 +887,8 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                 currentSpeed = 0.0;
                 _pointCounter = 0;
                 _elapsedTime = 0;
+                _totalDistance = 0.0; // Reset distance
+                _batchCounter = 0; // Reset batch counter
                 lastPosition = null;
                 _webDeltaPoints.clear(); // Clear web delta buffer
                 _webBatchCounter = 0; // Reset batch counter
@@ -1263,32 +1319,56 @@ class CurrentTripPageState extends State<CurrentTripPage> {
           BoxShadow(color: Colors.black26, blurRadius: screenWidth * 0.015),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildStatColumn(
-            Icons.timer,
-            'Duration',
-            formatElapsedTime(),
-            Colors.blue,
+          // First row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatColumn(
+                Icons.timer,
+                'Duration',
+                formatElapsedTime(),
+                Colors.blue,
+              ),
+              _buildStatColumn(
+                Icons.speed,
+                'Current',
+                '${currentSpeed.toStringAsFixed(1)} mph',
+                Colors.green,
+              ),
+              _buildStatColumn(
+                Icons.trending_up,
+                'Max Speed',
+                '${maxSpeed.toStringAsFixed(1)} mph',
+                Colors.red,
+              ),
+            ],
           ),
-          _buildStatColumn(
-            Icons.speed,
-            'Current',
-            '${currentSpeed.toStringAsFixed(1)} mph',
-            Colors.green,
-          ),
-          _buildStatColumn(
-            Icons.trending_up,
-            'Max Speed',
-            '${maxSpeed.toStringAsFixed(1)} mph',
-            Colors.red,
-          ),
-          _buildStatColumn(
-            Icons.location_on,
-            'Points',
-            '$_pointCounter',
-            Colors.orange,
+          SizedBox(height: screenWidth * 0.03),
+          // Second row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatColumn(
+                Icons.straighten,
+                'Distance',
+                '${_totalDistance.toStringAsFixed(2)} mi',
+                Colors.purple,
+              ),
+              _buildStatColumn(
+                Icons.location_on,
+                'Points',
+                '$_pointCounter',
+                Colors.orange,
+              ),
+              _buildStatColumn(
+                Icons.cloud_upload,
+                'Batches',
+                '$_batchCounter',
+                Colors.teal,
+              ),
+            ],
           ),
         ],
       ),

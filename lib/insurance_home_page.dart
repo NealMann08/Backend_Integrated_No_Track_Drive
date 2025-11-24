@@ -188,7 +188,7 @@ Widget _buildMobileLayout(bool isWeb) {
   Widget _buildWelcomeCard({required bool isWeb}) {
     // Get ISP name from SharedPreferences
     String ispName = 'Insurance Provider'; // Default
-    
+
     // Add this async call to get the name
     SharedPreferences.getInstance().then((prefs) {
       final userData = prefs.getString('user_data');
@@ -246,10 +246,29 @@ Widget _buildMobileLayout(bool isWeb) {
                 ],
               ),
             ),
+            // Logout button
+            IconButton(
+              icon: Icon(
+                Icons.logout,
+                color: Colors.white,
+                size: isWeb ? 28 : 24,
+              ),
+              onPressed: _logout,
+              tooltip: 'Logout',
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('access_token');
+    await prefs.remove('user_data');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
 Widget _buildUserSearchCard({
