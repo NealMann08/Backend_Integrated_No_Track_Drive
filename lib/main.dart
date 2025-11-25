@@ -73,8 +73,12 @@ class MyApp extends StatelessWidget {
           visualDensity: VisualDensity.adaptivePlatformDensity,
         ),
         home: LoginPageWidget(),
-        // home: AdminHomePage(),
-        // home: InsuranceHomePage(),
+        // Define routes for navigation
+        routes: {
+          '/login': (context) => LoginPageWidget(),
+          '/admin': (context) => AdminHomePage(),
+          '/insurance': (context) => InsuranceHomePage(),
+        },
       ),
     );
   }

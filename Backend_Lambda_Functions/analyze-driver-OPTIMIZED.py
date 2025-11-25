@@ -1576,9 +1576,68 @@ def process_trip_with_frontend_values(deltas: List[Dict], user_base_point: Dict,
         max_speed = 0.0
         avg_speed = 0.0
     
+    # Handle stationary trips (0 distance)
     if total_distance_miles <= 0:
-        print(f"❌ Invalid distance calculated: {total_distance_miles}")
-        return None
+        print(f"⚠️ Stationary trip detected: {total_distance_miles} miles")
+        print(f"📊 Creating minimal analysis for stationary trip")
+
+        # Return minimal analysis for stationary trips
+        return {
+            'start_timestamp': start_timestamp,
+            'end_timestamp': end_timestamp,
+            'duration_minutes': duration_minutes,
+            'formatted_duration': format_duration_smart(duration_minutes),
+            'total_distance_miles': 0.0,
+
+            'avg_speed_mph': 0.0,
+            'moving_avg_speed_mph': 0.0,
+            'max_speed_mph': max_speed if 'max_speed' in locals() else 0.0,
+            'min_speed_mph': 0.0,
+            'speed_consistency': 0.0,
+
+            'moving_time_minutes': 0.0,
+            'stationary_time_minutes': duration_minutes,
+            'moving_percentage': 0.0,
+
+            'total_harsh_events': 0,
+            'total_dangerous_events': 0,
+            'acceleration_events': [],
+            'deceleration_events': [],
+            'sudden_accelerations': 0,
+            'sudden_decelerations': 0,
+            'hard_stops': 0,
+            'event_breakdown': {'gentle': 0, 'normal': 0, 'assertive': 0, 'harsh': 0, 'dangerous': 0, 'extreme': 0},
+            'smoothness_score': 0.0,
+            'segments_analyzed': 0,
+
+            'events_per_100_miles': 0.0,
+            'weighted_events_per_100_miles': 0.0,
+            'harsh_events_per_100_miles': 0.0,
+            'dangerous_events_per_100_miles': 0.0,
+            'industry_rating': 'No Movement',
+            'frequency_score': 0,
+            'risk_percentile': 0,
+
+            'total_turns': 0,
+            'safe_turns': 0,
+            'moderate_turns': 0,
+            'aggressive_turns': 0,
+            'dangerous_turns': 0,
+            'turn_safety_score': 0.0,
+
+            'behavior_score': 0.0,
+            'behavior_category': 'Stationary',
+
+            'privacy_protected': user_base_point.get('source', 'fallback') != 'fallback',
+            'base_point_city': user_base_point.get('city', 'Unknown'),
+            'analysis_algorithm': 'stationary_trip',
+            'algorithm_version': '2.0_stationary_handling',
+            'data_quality': 'stationary',
+            'data_source': 'frontend_exact' if stored_trip_data and stored_trip_data.get('use_gps_metrics') else 'delta_coordinates',
+            'coordinate_format': coordinate_format,
+            'driving_context': {'context': 'stationary', 'confidence': 1.0},
+            'is_stationary_trip': True,
+        }
     
     # Extract speeds and time intervals
     speeds = extract_and_validate_speeds(deltas)

@@ -80,6 +80,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   void initState() {
     super.initState();
     _loadUserInfo();
+    _loadTripState(); // Load persisted trip state
     _requestPermissions();
     _initForegroundTask();
   }
@@ -90,6 +91,29 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     role = prefs.getString('role')!;
     setState(() {
       isLoading = false;
+    });
+  }
+
+  Future<void> _loadTripState() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Restore trip state if exists
+    setState(() {
+      _totalDistance = prefs.getDouble('total_distance') ?? 0.0;
+      _batchCounter = prefs.getInt('batch_counter') ?? 0;
+      _pointCounter = prefs.getInt('point_counter') ?? 0;
+      currentSpeed = prefs.getDouble('current_speed') ?? 0.0;
+      maxSpeed = prefs.getDouble('max_speed') ?? 0.0;
+
+      // Load trip metadata if active
+      String? tripId = prefs.getString('current_trip_id');
+      String? startTimeStr = prefs.getString('trip_start_time');
+
+      if (tripId != null && startTimeStr != null) {
+        isTripStarted = true;
+        tripStartTime = DateTime.parse(startTimeStr);
+        print('✅ Restored trip state: Distance=${_totalDistance.toStringAsFixed(3)}mi, Points=$_pointCounter, Batches=$_batchCounter');
+      }
     });
   }
 
