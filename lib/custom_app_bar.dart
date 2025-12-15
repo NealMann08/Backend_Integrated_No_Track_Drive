@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Importing all the necessary pages that this app bar will navigate to
-import 'current_trip_page.dart';
 import 'home_page.dart';
 import 'previous_trips_page.dart';
 import 'score_page.dart';
 import 'settings_page.dart';
-import 'user_lookup.dart';
-import 'user_score_page.dart';
-import 'user_trips_page.dart';
 
 /// A custom AppBar widget that also implements PreferredSizeWidget to ensure proper sizing.
 /// This widget handles both the top app bar and bottom navigation bar functionality.
@@ -146,9 +143,69 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 
   /// Handles navigation to different pages based on the selected index and user role
-  void _navigateToPage(BuildContext context, int index) {
+  Future<void> _navigateToPage(BuildContext context, int index) async {
+    // CRITICAL: Check if there's an active trip before allowing navigation
+    // This prevents users from leaving the current trip page while tracking is active
+    final prefs = await SharedPreferences.getInstance();
+    final activeTripId = prefs.getString('current_trip_id');
+    final tripStartTime = prefs.getString('trip_start_time');
+
+    // Cache context check before async operations
+    if (!context.mounted) return;
+
+    // If there's an active trip, block navigation and show warning
+    if (activeTripId != null && activeTripId.isNotEmpty && tripStartTime != null) {
+      // Check if the trip is recent (within last 4 hours - not abandoned)
+      final startTime = DateTime.parse(tripStartTime);
+      final timeSinceStart = DateTime.now().difference(startTime);
+
+      if (timeSinceStart.inHours <= 4) {
+        // Active trip detected - prevent navigation
+        if (!context.mounted) return;
+
+        // CRITICAL FIX: Don't provide "Go to Trip" button as it creates a NEW CurrentTripPage
+        // This would kill the active trip state and freeze the data
+        // User should stop the trip manually instead
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Trip in Progress',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Stop your trip before navigating',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade700,
+            duration: Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+        return; // Block navigation
+      }
+    }
+
     Widget page;
-    
+
     if (role == 'insurance') {
       // Insurance users only have Dashboard and Settings
       switch (index) {
@@ -196,6 +253,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           return;
       }
     }
+
+    // Check context is still mounted before navigation
+    if (!context.mounted) return;
 
     // Replace the current page with the new one (no back stack)
     Navigator.pushReplacement(

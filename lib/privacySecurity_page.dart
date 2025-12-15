@@ -53,41 +53,43 @@ class _PrivSecPageState extends State<PrivSecPage> {
                 );
               },
             ),
-            SwitchSettingsTile(
-              settingKey: 'biometric_auth',
-              title: 'Biometric Login',
-              subtitle: 'Use Face or Fingerprint to log in',
-              leading: Icon(Icons.fingerprint),
-              defaultValue: false,
-              onChange: (enabled) {
-                // TODO: Enable or disable biometric login
-              },
-            ),
+            // DISABLED: Biometric login not implemented
+            // SwitchSettingsTile(
+            //   settingKey: 'biometric_auth',
+            //   title: 'Biometric Login',
+            //   subtitle: 'Use Face or Fingerprint to log in',
+            //   leading: Icon(Icons.fingerprint),
+            //   defaultValue: false,
+            //   onChange: (enabled) {
+            //     // TODO: Enable or disable biometric login
+            //   },
+            // ),
           ],
         ),
-        SettingsGroup(
-          title: 'Privacy Options',
-          children: [
-            SwitchSettingsTile(
-              settingKey: 'location_sharing',
-              title: 'Location Access',
-              subtitle: 'Allow app to access your location',
-              leading: Icon(Icons.location_on),
-              defaultValue: false,
-              onChange: (enabled) {
-                // TODO: Handle location permission logic
-              },
-            ),
-            SimpleSettingsTile(
-              title: 'Privacy Policy',
-              subtitle: 'View how your data is handled',
-              leading: Icon(Icons.privacy_tip),
-              onTap: () {
-                // TODO: Open privacy policy page or URL
-              },
-            ),
-          ],
-        ),
+        // DISABLED: Privacy options not implemented
+        // SettingsGroup(
+        //   title: 'Privacy Options',
+        //   children: [
+        //     SwitchSettingsTile(
+        //       settingKey: 'location_sharing',
+        //       title: 'Location Access',
+        //       subtitle: 'Allow app to access your location',
+        //       leading: Icon(Icons.location_on),
+        //       defaultValue: false,
+        //       onChange: (enabled) {
+        //         // TODO: Handle location permission logic
+        //       },
+        //     ),
+        //     SimpleSettingsTile(
+        //       title: 'Privacy Policy',
+        //       subtitle: 'View how your data is handled',
+        //       leading: Icon(Icons.privacy_tip),
+        //       onTap: () {
+        //         // TODO: Open privacy policy page or URL
+        //       },
+        //     ),
+        //   ],
+        // ),
       ],
     ),
   );

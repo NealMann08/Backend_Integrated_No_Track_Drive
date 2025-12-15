@@ -112,7 +112,7 @@ class _AccountPageState extends State<AccountPage> {
           children: <Widget>[
             buildProfilePicture(context),
             //PrivacyPage(),
-            buildChooseLang(),
+            // buildChooseLang(), // DISABLED: Language selection not implemented
           ],
         ),
       );

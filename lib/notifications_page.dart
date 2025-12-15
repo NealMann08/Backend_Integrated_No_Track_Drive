@@ -40,35 +40,48 @@ class _NotificationsPageState extends State<NotificationsPage> {
         child: SettingsScreen(
           title: 'Notifications',
           children: <Widget>[
-            SettingsGroup(
-              title: 'Notification Preferences',
-              children: [
-                SwitchSettingsTile(
-                  settingKey: 'trip_summary_notifications',
-                  title: 'Trip Summaries',
-                  subtitle: 'Receive a summary after each trip',
-                  leading: Icon(Icons.directions_car),
-                  defaultValue: true,
-                  onChange: (value) {
-                    // Handle toggle logic if needed
-                  },
+            Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Notification settings are currently under development and will be available in a future update.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
                 ),
-                SwitchSettingsTile(
-                  settingKey: 'driving_score_notifications',
-                  title: 'Driving Score Updates',
-                  subtitle: 'Get notified when your score changes',
-                  leading: Icon(Icons.bar_chart),
-                  defaultValue: true,
-                ),
-                SwitchSettingsTile(
-                  settingKey: 'reminder_notifications',
-                  title: 'Driving Reminders',
-                  subtitle: 'Get occasional safe driving tips and reminders',
-                  leading: Icon(Icons.alarm),
-                  defaultValue: false,
-                ),
-              ],
+                textAlign: TextAlign.center,
+              ),
             ),
+            // DISABLED: Notification system not implemented
+            // SettingsGroup(
+            //   title: 'Notification Preferences',
+            //   children: [
+            //     SwitchSettingsTile(
+            //       settingKey: 'trip_summary_notifications',
+            //       title: 'Trip Summaries',
+            //       subtitle: 'Receive a summary after each trip',
+            //       leading: Icon(Icons.directions_car),
+            //       defaultValue: true,
+            //       onChange: (value) {
+            //         // Handle toggle logic if needed
+            //       },
+            //     ),
+            //     SwitchSettingsTile(
+            //       settingKey: 'driving_score_notifications',
+            //       title: 'Driving Score Updates',
+            //       subtitle: 'Get notified when your score changes',
+            //       leading: Icon(Icons.bar_chart),
+            //       defaultValue: true,
+            //     ),
+            //     SwitchSettingsTile(
+            //       settingKey: 'reminder_notifications',
+            //       title: 'Driving Reminders',
+            //       subtitle: 'Get occasional safe driving tips and reminders',
+            //       leading: Icon(Icons.alarm),
+            //       defaultValue: false,
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       );

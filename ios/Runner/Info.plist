@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.example.app.locationProcessing</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -24,6 +30,26 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to take a profile picture.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Drive Guard requires "Always" location access to track your driving trips continuously, even when your phone screen is locked or the app is in the background. This ensures complete trip data collection for accurate safety analysis. Location is ONLY tracked during active trips when you tap "Start Tracking" - never at other times.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Drive Guard requires continuous location access to track complete driving trips, even when your phone is locked or the app is in the background. This is essential for accurate safety scoring. We only collect location data during active trips (when you explicitly start tracking) and never at other times. Your privacy is protected through delta-coordinate encoding.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Drive Guard needs your location to track your driving trips and generate safety scores. Location is only collected during active trips.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your gallery to set your profile picture.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Drive Guard uses motion sensors to detect when you're driving vs. stationary. This helps conserve battery by pausing GPS tracking when your vehicle is parked for extended periods.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -40,36 +66,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your gallery to set your profile picture.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take a profile picture.</string>
-	
-	<!-- Location permissions -->
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Drive Guard needs your location to track your driving trips and generate safety scores. Location is only collected during active trips.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Drive Guard requires "Always" location access to track your driving trips continuously, even when your phone screen is locked or the app is in the background. This ensures complete trip data collection for accurate safety analysis. Location is ONLY tracked during active trips when you tap "Start Tracking" - never at other times.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Drive Guard requires continuous location access to track complete driving trips, even when your phone is locked or the app is in the background. This is essential for accurate safety scoring. We only collect location data during active trips (when you explicitly start tracking) and never at other times. Your privacy is protected through delta-coordinate encoding.</string>
-	
-	<!-- Background modes -->
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>location</string>
-		<string>fetch</string>
-		<string>processing</string>
-	</array>
-	
-	<!-- Background task identifier -->
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.pravera.flutter_foreground_task</string>
 	</array>
 </dict>
 </plist>

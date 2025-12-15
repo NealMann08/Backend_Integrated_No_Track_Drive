@@ -11,6 +11,7 @@ import 'home_page.dart';
 import 'login_page.dart';
 import 'account_page.dart';
 import 'notifications_page.dart';
+import 'data_manager.dart'; // Import DataManager for cache clearing
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -166,7 +167,62 @@ Widget buildLogout(BuildContext context) => SimpleSettingsTile(
   subtitle: '',
   onTap: () async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token'); // Remove stored authentication token
+
+    // 🔐 CRITICAL FIX: Clear ALL user-specific data to prevent data leakage
+    print('🧹 Starting logout - clearing all user data...');
+
+    // 1. Clear authentication tokens (FIXED: was using wrong key 'auth_token')
+    await prefs.remove('access_token');
+    await prefs.remove('auth_token'); // Legacy key (kept for compatibility)
+    print('✅ Cleared authentication tokens');
+
+    // 2. Clear user profile data
+    await prefs.remove('user_data');
+    await prefs.remove('user_id');
+    await prefs.remove('email');
+    await prefs.remove('first_name');
+    await prefs.remove('last_name');
+    await prefs.remove('role');
+    await prefs.remove('user_zipcode');
+    await prefs.remove('profile_image');
+    print('✅ Cleared user profile data');
+
+    // 3. Clear trip data caches
+    await prefs.remove('cached_analytics');
+    await prefs.remove('analytics_cache_time');
+    await prefs.remove('analytics_cache_user_id'); // 🔐 Clear user_id associated with cache
+    await prefs.remove('cached_trips');
+    await prefs.remove('cache_time');
+    print('✅ Cleared trip data caches');
+
+    // 4. Clear active trip data
+    await prefs.remove('current_trip_id');
+    await prefs.remove('trip_start_time');
+    await prefs.setInt('batch_counter', 0);
+    await prefs.setDouble('max_speed', 0.0);
+    await prefs.setInt('point_counter', 0);
+    await prefs.setDouble('current_speed', 0.0);
+    await prefs.setDouble('total_distance', 0.0);
+    await prefs.setInt('elapsed_time', 0);
+    print('✅ Cleared active trip data');
+
+    // 5. Clear DataManager static cache (CRITICAL!)
+    DataManager.clearCache();
+    print('✅ Cleared DataManager static cache');
+
+    // 6. Get all keys and clear any trip-specific data
+    Set<String> allKeys = prefs.getKeys();
+    for (String key in allKeys) {
+      if (key.startsWith('first_actual_point_') ||
+          key.startsWith('previous_point_') ||
+          key.startsWith('trip_') ||
+          key.startsWith('cached_')) {
+        await prefs.remove(key);
+        print('✅ Cleared trip-specific key: $key');
+      }
+    }
+
+    print('🔐 Logout complete - all user data cleared');
 
     Navigator.pushAndRemoveUntil(
       context,

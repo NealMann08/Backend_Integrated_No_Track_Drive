@@ -2124,34 +2124,42 @@ def lambda_handler(event, context):
         total_trips = len(trip_analyses)
         total_distance = sum(trip['total_distance_miles'] for trip in trip_analyses)
         total_time_minutes = sum(trip['duration_minutes'] for trip in trip_analyses)
-        
+
         # FIXED: Calculate overall moving time and moving average speed
         total_moving_time_minutes = sum(trip.get('moving_time_minutes', trip['duration_minutes']) for trip in trip_analyses)
         total_stationary_time_minutes = sum(trip.get('stationary_time_minutes', 0) for trip in trip_analyses)
+
+        # PRIVACY FIX: Allow stationary trips (distance = 0) - they are still valid trips!
+        # Only reject if there are NO trips at all, not if trips are stationary
+        # This allows trip history to show even when user was stationary (e.g., testing consecutive deltas)
+        # if total_distance <= 0:
+        #     return {
+        #         'statusCode': 400,
+        #         'headers': {
+        #             'Content-Type': 'application/json',
+        #             'Access-Control-Allow-Origin': '*'
+        #         },
+        #         'body': json.dumps({
+        #             'error': 'No valid distance data found',
+        #             'user_id': user_id
+        #         })
+        #     }
         
-        if total_distance <= 0:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'No valid distance data found',
-                    'user_id': user_id
-                })
-            }
-        
-        # Calculate weighted averages
-        weighted_behavior_score = sum(
-            trip['behavior_score'] * trip['total_distance_miles']
-            for trip in trip_analyses
-        ) / total_distance
-        
-        overall_speed_consistency = sum(
-            trip['speed_consistency'] * trip['total_distance_miles']
-            for trip in trip_analyses
-        ) / total_distance
+        # Calculate weighted averages (handle stationary trips with 0 distance)
+        if total_distance > 0:
+            weighted_behavior_score = sum(
+                trip['behavior_score'] * trip['total_distance_miles']
+                for trip in trip_analyses
+            ) / total_distance
+
+            overall_speed_consistency = sum(
+                trip['speed_consistency'] * trip['total_distance_miles']
+                for trip in trip_analyses
+            ) / total_distance
+        else:
+            # Stationary trips: use simple average instead of weighted
+            weighted_behavior_score = sum(trip['behavior_score'] for trip in trip_analyses) / len(trip_analyses)
+            overall_speed_consistency = sum(trip['speed_consistency'] for trip in trip_analyses) / len(trip_analyses)
         
         # FIXED: Calculate overall moving average speed
         if total_moving_time_minutes > 0:
@@ -2168,29 +2176,39 @@ def lambda_handler(event, context):
         # Aggregate harsh events
         total_harsh_events = sum(trip['total_harsh_events'] for trip in trip_analyses)
         total_dangerous_events = sum(trip['total_dangerous_events'] for trip in trip_analyses)
-        
-        # Calculate overall frequency metrics
-        overall_events_per_100_miles = (total_harsh_events / total_distance) * 100
+
+        # Calculate overall frequency metrics (handle stationary trips)
+        if total_distance > 0:
+            overall_events_per_100_miles = (total_harsh_events / total_distance) * 100
+        else:
+            overall_events_per_100_miles = 0.0
         
         # Aggregate context information
         context_distribution = {}
         for trip in trip_analyses:
             context = trip.get('driving_context', {}).get('context', 'mixed')
             context_distribution[context] = context_distribution.get(context, 0) + trip['total_distance_miles']
-        
-        # Determine dominant context
-        if context_distribution:
+
+        # Determine dominant context (handle stationary trips)
+        if context_distribution and total_distance > 0:
             dominant_context = max(context_distribution.keys(), key=lambda k: context_distribution[k])
             context_confidence = context_distribution[dominant_context] / total_distance
         else:
-            dominant_context = 'mixed'
+            dominant_context = 'stationary'
             context_confidence = 1.0
-        
-        # Calculate overall weighted events
-        overall_weighted_events = sum(
-            trip.get('weighted_events_per_100_miles', trip['events_per_100_miles']) * trip['total_distance_miles']
-            for trip in trip_analyses
-        ) / total_distance
+
+        # Calculate overall weighted events (handle stationary trips)
+        if total_distance > 0:
+            overall_weighted_events = sum(
+                trip.get('weighted_events_per_100_miles', trip['events_per_100_miles']) * trip['total_distance_miles']
+                for trip in trip_analyses
+            ) / total_distance
+        else:
+            # Stationary trips: use simple average
+            overall_weighted_events = sum(
+                trip.get('weighted_events_per_100_miles', trip['events_per_100_miles'])
+                for trip in trip_analyses
+            ) / len(trip_analyses) if trip_analyses else 0.0
         
         # Determine overall industry rating
         if overall_weighted_events <= IndustryStandardMetrics.FREQUENCY_BENCHMARKS['exceptional']:

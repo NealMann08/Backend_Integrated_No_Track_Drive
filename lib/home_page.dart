@@ -37,12 +37,36 @@ class HomePageState extends State<HomePage> {
     _checkAuthToken();
     _loadProfileImage();
     _preloadUserData(); // Add this
-
+    _clearStaleTripData(); // CRITICAL: Clear stale trip data on app entry
   }
 
   void _preloadUserData() async {
     // Preload all user data in the background
     DataManager.preloadData();
+  }
+
+  /// CRITICAL FIX: Automatically clear stale trip data when entering the app
+  /// This prevents the navigation blocking bug where old trip data blocks navigation
+  Future<void> _clearStaleTripData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? tripId = prefs.getString('current_trip_id');
+    String? startTimeStr = prefs.getString('trip_start_time');
+
+    // If there's any trip data, clear it (it's from a previous session)
+    if (tripId != null && startTimeStr != null) {
+      print('🧹 Auto-clearing stale trip data from previous session');
+
+      // Clear all trip-related data
+      await prefs.remove('current_trip_id');
+      await prefs.remove('trip_start_time');
+      await prefs.setInt('batch_counter', 0);
+      await prefs.setDouble('max_speed', 0.0);
+      await prefs.setInt('point_counter', 0);
+      await prefs.setDouble('current_speed', 0.0);
+      await prefs.setDouble('total_distance', 0.0);
+
+      print('✅ Stale trip data cleared - navigation unrestricted');
+    }
   }
 
 

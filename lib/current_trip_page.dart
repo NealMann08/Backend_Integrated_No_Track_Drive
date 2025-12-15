@@ -8,17 +8,8 @@ import 'home_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
-import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'location_foreground_task.dart';
+import 'background_location_handler.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
-// CRITICAL FOR iOS: This callback MUST be a top-level function (outside any class)
-// iOS requires this because the foreground task runs in a separate isolate
-// and cannot access instance methods or class members
-@pragma('vm:entry-point')
-void startCallback() {
-  FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
-}
 
 class CurrentTripPage extends StatefulWidget {
   const CurrentTripPage({super.key});
@@ -32,6 +23,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   bool isLoading = true;
   Timer? _elapsedTimeTimer;
   Timer? _speedUpdateTimer;
+  // Removed: _backgroundDataTimer - no longer needed with timer-based tracking
   DateTime? tripStartTime;
   int _elapsedTime = 0;
   int _pointCounter = 0;
@@ -80,9 +72,9 @@ class CurrentTripPageState extends State<CurrentTripPage> {
   void initState() {
     super.initState();
     _loadUserInfo();
-    _loadTripState(); // Load persisted trip state
+    _checkAndCleanupTripState(); // Check for stale trip data and clean up
     _requestPermissions();
-    _initForegroundTask();
+    // No longer initializing foreground task - using simple timer-based tracking
   }
 
   Future<void> _loadUserInfo() async {
@@ -94,113 +86,59 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     });
   }
 
-  Future<void> _loadTripState() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-
-    // Restore trip state if exists
+  /// Initialize the page in a clean state
+  /// NOTE: Stale trip data is now cleaned up automatically in HomePage on app entry
+  /// So we just need to ensure the UI starts in the correct state
+  Future<void> _checkAndCleanupTripState() async {
+    // Just ensure UI starts in clean state (data already cleaned by HomePage)
     setState(() {
-      _totalDistance = prefs.getDouble('total_distance') ?? 0.0;
-      _batchCounter = prefs.getInt('batch_counter') ?? 0;
-      _pointCounter = prefs.getInt('point_counter') ?? 0;
-      currentSpeed = prefs.getDouble('current_speed') ?? 0.0;
-      maxSpeed = prefs.getDouble('max_speed') ?? 0.0;
-
-      // Load trip metadata if active
-      String? tripId = prefs.getString('current_trip_id');
-      String? startTimeStr = prefs.getString('trip_start_time');
-
-      if (tripId != null && startTimeStr != null) {
-        isTripStarted = true;
-        tripStartTime = DateTime.parse(startTimeStr);
-        print('✅ Restored trip state: Distance=${_totalDistance.toStringAsFixed(3)}mi, Points=$_pointCounter, Batches=$_batchCounter');
-      }
+      isTripStarted = false;
+      _totalDistance = 0.0;
+      _batchCounter = 0;
+      _pointCounter = 0;
+      currentSpeed = 0.0;
+      maxSpeed = 0.0;
+      _elapsedTime = 0;
+      tripStartTime = null;
+      lastPosition = null;
     });
+
+    print('✅ Current trip page initialized in clean state');
   }
 
-  void _initForegroundTask() {
-    FlutterForegroundTask.init(
-      androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'location_tracking',
-        channelName: 'Location Tracking',
-        channelDescription: 'Tracking your trip location',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
-        // Icon is set in Android manifest, not here
-      ),
-      iosNotificationOptions: const IOSNotificationOptions(
-        showNotification: true,
-        playSound: false,
-      ),
-      foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(2000), // Repeat every 2 seconds
-        autoRunOnBoot: false,
-        allowWakeLock: true,
-        allowWifiLock: true,
-      ),
-    );
+  /// Helper function to clear all trip data from SharedPreferences
+  Future<void> _clearTripData(SharedPreferences prefs) async {
+    // PRIVACY CRITICAL: Get trip ID before clearing it, so we can cleanup privacy-sensitive data
+    String? tripId = prefs.getString('current_trip_id');
 
-    // Note: ReceivePort listener will be set up AFTER service starts
-    // (ReceivePort doesn't exist until service is running)
-  }
-
-  // Callback to receive data from background isolate via SendPort
-  void _onReceiveTaskData(dynamic data) {
-    print("📥 ========== UI RECEIVED DATA FROM BACKGROUND ISOLATE ==========");
-    print("📥 Raw data type: ${data.runtimeType}");
-    print("📥 Raw data content: $data");
-
-    if (data == null) {
-      print("❌ ERROR: Received null data from background isolate!");
-      print("📥 ========== DATA RECEIVE END (NULL) ==========");
-      return;
+    if (tripId != null && tripId.isNotEmpty) {
+      // Cleanup privacy-sensitive trip data (first_actual_point, previous_point)
+      // This removes locally stored GPS points that were never sent to server
+      await BackgroundLocationHandler.cleanupTripData(tripId);
+      print('🔐 Privacy-sensitive trip data cleaned up for trip: $tripId');
     }
 
-    if (data is Map) {
-      print("✅ Data is a Map - proceeding to update UI");
-      print("📥 Map keys: ${data.keys.toList()}");
-
-      setState(() {
-        if (data.containsKey('point_counter')) {
-          int newCounter = data['point_counter'] as int;
-          print("📊 Updating point counter: $_pointCounter -> $newCounter");
-          _pointCounter = newCounter;
-          print("✅ Point counter updated successfully: $_pointCounter");
-        } else {
-          print("⚠️ WARNING: point_counter key not found in data");
-        }
-
-        if (data.containsKey('current_speed')) {
-          double newSpeed = (data['current_speed'] as num).toDouble();
-          print("📊 Updating current speed: ${currentSpeed.toStringAsFixed(1)} -> ${newSpeed.toStringAsFixed(1)} mph");
-          currentSpeed = newSpeed;
-          print("✅ Current speed updated successfully: ${currentSpeed.toStringAsFixed(1)} mph");
-        } else {
-          print("⚠️ WARNING: current_speed key not found in data");
-        }
-
-        if (data.containsKey('max_speed')) {
-          double newMaxSpeed = (data['max_speed'] as num).toDouble();
-          print("📊 Updating max speed: ${maxSpeed.toStringAsFixed(1)} -> ${newMaxSpeed.toStringAsFixed(1)} mph");
-          maxSpeed = newMaxSpeed;
-          print("✅ Max speed updated successfully: ${maxSpeed.toStringAsFixed(1)} mph");
-        } else {
-          print("⚠️ WARNING: max_speed key not found in data");
-        }
-      });
-
-      print("✅ setState() called - UI should rebuild now");
-      print("📥 ========== UI UPDATE COMPLETE ==========");
-    } else {
-      print("❌ ERROR: Data is not a Map! Type: ${data.runtimeType}");
-      print("📥 ========== DATA RECEIVE END (WRONG TYPE) ==========");
-    }
+    await prefs.remove('current_trip_id');
+    await prefs.remove('trip_start_time');
+    await prefs.setInt('batch_counter', 0);
+    await prefs.setDouble('max_speed', 0.0);
+    await prefs.setInt('point_counter', 0);
+    await prefs.setDouble('current_speed', 0.0);
+    await prefs.setDouble('total_distance', 0.0);
+    await prefs.setInt('elapsed_time', 0); // Clear elapsed time
+    print('🧹 All trip data cleared from SharedPreferences');
   }
+
+  // Removed: _initForegroundTask(), _onReceiveTaskData(), _pollBackgroundServiceData()
+  // No longer using foreground service - using simple timer-based tracking instead
 
   @override
   void dispose() {
+    print('🔧 Disposing CurrentTripPage - cleaning up timers');
     _elapsedTimeTimer?.cancel();
     _speedUpdateTimer?.cancel();
-    // Note: ReceivePort listener is automatically cleaned up by flutter_foreground_task
+    // No longer using foreground service or background data timer
+    print('✅ Timers cancelled');
     super.dispose();
   }
 
@@ -453,20 +391,21 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       await prefs.setInt('point_counter', 0);
       await prefs.setDouble('current_speed', 0.0);
       await prefs.setDouble('total_distance', 0.0); // Store distance
-      
+      await prefs.setInt('elapsed_time', 0); // CRITICAL: Clear old elapsed time
+
       print('✅ Created trip: $tripId');
-      
-      // Timer to update elapsed time (works on all platforms)
-      _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-        if (mounted) {
-          setState(() {
-            _elapsedTime++;
-          });
-        }
-      });
-      
+      print('✅ All trip data initialized to 0 (including elapsed_time)');
+
       // Platform-specific tracking
       if (kIsWeb) {
+        // WEB: Timer to update elapsed time (web doesn't have background service)
+        _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+          if (mounted) {
+            setState(() {
+              _elapsedTime++;
+            });
+          }
+        });
         // WEB PLATFORM: Use timer-based location polling
         print('🌐 ========== WEB PLATFORM TRACKING STARTING ==========');
         print('🌐 Web platform detected - using timer-based tracking');
@@ -490,40 +429,33 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               desiredAccuracy: LocationAccuracy.high,
             ).timeout(Duration(seconds: 5));
 
-            print('✅ GPS position obtained - Accuracy: ${position.accuracy}m');
-            
-            // Calculate speed (improved logic matching mobile)
-            double speedMph = 0.0;
-            bool usedGpsSpeed = false;
+            print('✅ GPS: Lat ${position.latitude}, Lon ${position.longitude}, Accuracy: ${position.accuracy}m');
 
-            // Method 1: Try GPS-provided speed
-            if (position.speed != null && position.speed! >= 0) {
+            // Calculate speed - ALWAYS have a value for current speed
+            double speedMph = 0.0;
+
+            if (position.speed != null && position.speed! > 0) {
+              // Prefer GPS-provided speed when available and valid
               speedMph = position.speed! * 2.237; // Convert m/s to mph
-              usedGpsSpeed = true;
-              print('📊 Web: Using GPS speed: ${speedMph.toStringAsFixed(1)} mph');
-            }
-            // Method 2: Calculate from previous position
-            else if (lastPosition != null) {
+              print('📊 Web: GPS speed: ${speedMph.toStringAsFixed(1)} mph');
+            } else if (lastPosition != null) {
+              // ALWAYS calculate from distance when GPS speed unavailable
               double distanceMeters = Geolocator.distanceBetween(
                 lastPosition!.latitude,
                 lastPosition!.longitude,
                 position.latitude,
                 position.longitude,
               );
-              double distanceMiles = distanceMeters * 0.000621371; // meters to miles
               double timeHours = 2.0 / 3600.0; // 2 seconds in hours
+              double distanceMiles = distanceMeters * 0.000621371;
 
-              if (distanceMeters > 0.5) { // Ignore tiny movements
-                speedMph = distanceMiles / timeHours;
-                print('📊 Web: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
-              }
+              // Calculate speed regardless of distance (even if small)
+              speedMph = distanceMiles / timeHours;
+              print('📊 Web: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
             }
 
-            // Cap unrealistic speeds
-            if (speedMph > 150) {
-              speedMph = currentSpeed; // Keep previous speed
-              print('⚠️ Web: Unrealistic speed capped');
-            }
+            // Sanity check: reject unrealistic speeds
+            if (speedMph > 150) speedMph = currentSpeed;
 
             // Calculate distance from last position
             double segmentDistance = 0.0;
@@ -536,19 +468,44 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               );
               segmentDistance = distanceMeters * 0.000621371; // Convert meters to miles
 
-              // Only add distance if movement is significant (filter GPS drift)
-              if (segmentDistance > 0.001) { // Minimum 5.3 feet
-                _totalDistance += segmentDistance;
-              }
+              print('📏 Web: Distance this segment: ${(segmentDistance * 5280).toStringAsFixed(1)} feet (${segmentDistance.toStringAsFixed(4)} mi)');
+            } else {
+              print('📏 Web: First point - no previous position for distance calc');
             }
 
-            // Update state
+            // Update state - CRITICAL: All state changes must happen inside setState()
             setState(() {
               currentSpeed = speedMph;
-              if (speedMph > maxSpeed) {
+
+              // Smart max speed filtering to avoid GPS errors
+              // Ignore speed spikes that are clearly GPS errors:
+              // 1. Speed > 120 mph (unrealistic for normal driving)
+              // 2. First 10 GPS points (warm-up period)
+              // 3. Poor GPS accuracy (> 20 meters)
+              bool isValidSpeedReading = speedMph <= 120.0 &&
+                                          _pointCounter >= 10 &&
+                                          position.accuracy <= 20.0;
+
+              if (isValidSpeedReading && speedMph > maxSpeed) {
                 maxSpeed = speedMph;
+                print('🏎️ New max speed: ${maxSpeed.toStringAsFixed(1)} mph (accuracy: ${position.accuracy.toStringAsFixed(1)}m)');
+              } else if (speedMph > 120.0) {
+                print('⚠️ Ignoring erratic speed spike: ${speedMph.toStringAsFixed(1)} mph (GPS error)');
+              } else if (_pointCounter < 10) {
+                print('⚠️ GPS warm-up period: ignoring speed for max speed calculation (point $_pointCounter/10)');
+              } else if (position.accuracy > 20.0) {
+                print('⚠️ Poor GPS accuracy: ${position.accuracy.toStringAsFixed(1)}m - ignoring speed for max calculation');
               }
+
               _pointCounter++;
+
+              // Accumulate distance inside setState so UI updates immediately
+              if (segmentDistance > 0.001) { // Minimum 5.3 feet to filter GPS drift
+                _totalDistance += segmentDistance;
+                print('✅ Web: Distance accumulated. Total: ${_totalDistance.toStringAsFixed(3)} mi');
+              } else if (segmentDistance > 0) {
+                print('⏸️ Web: Segment too small (${(segmentDistance * 5280).toStringAsFixed(1)} ft), not accumulated (GPS drift filter)');
+              }
             });
 
             lastPosition = position;
@@ -559,39 +516,69 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             await prefs.setInt('point_counter', _pointCounter);
             await prefs.setDouble('total_distance', _totalDistance);
 
-            // Calculate delta coordinates for web (same as mobile)
+            // ========== PRIVACY-PRESERVING CONSECUTIVE DELTA CALCULATION ==========
+            // Following GeoSecure-R methodology from research papers
             String? userDataJson = prefs.getString('user_data');
-            if (userDataJson != null) {
+            String? tripId = prefs.getString('current_trip_id');
+
+            if (userDataJson != null && tripId != null) {
               Map<String, dynamic> userData = json.decode(userDataJson);
               if (userData['base_point'] != null) {
-                double baseLat = (userData['base_point']['latitude'] ?? 0.0).toDouble();
-                double baseLon = (userData['base_point']['longitude'] ?? 0.0).toDouble();
+                // Load or initialize first actual point for this trip
+                String? firstPointJson = prefs.getString('first_actual_point_$tripId');
+                Map<String, double>? firstActualPoint;
 
-                int deltaLat = ((position.latitude - baseLat) * 1000000).round();
-                int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+                if (firstPointJson != null) {
+                  firstActualPoint = Map<String, double>.from(json.decode(firstPointJson));
+                }
 
-                // Store delta point
-                _webDeltaPoints.add({
-                  'dlat': deltaLat,
-                  'dlon': deltaLon,
-                  'dt': 2000, // 2 seconds interval
-                  't': DateTime.now().toIso8601String(),
-                  'p': _pointCounter,
-                  'speed_mph': speedMph,
-                  'accuracy': position.accuracy,
-                  'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
-                });
+                // If this is the FIRST point of the trip, store it locally
+                if (firstActualPoint == null) {
+                  firstActualPoint = {
+                    'latitude': position.latitude,
+                    'longitude': position.longitude,
+                  };
+                  await prefs.setString('first_actual_point_$tripId', json.encode(firstActualPoint));
 
-                print('📊 Delta point stored - Buffer size: ${_webDeltaPoints.length}/25');
+                  print('🎯 FIRST POINT stored locally (NEVER sent to server)');
+                  print('🔐 Privacy: Server only knows zipcode region');
 
-                // Send batch when we have 25 points
-                if (_webDeltaPoints.length >= 25) {
-                  print('📤 ========== WEB BATCH READY ==========');
-                  await _sendWebBatchToServer(prefs, userId, tripId);
-                  setState(() {
-                    _batchCounter++;
+                  // Don't send data for first point
+                  lastPosition = position;
+                  return;
+                }
+
+                // Calculate CONSECUTIVE delta from last position
+                if (lastPosition != null) {
+                  int deltaLat = ((position.latitude - lastPosition!.latitude) * 1000000).round();
+                  int deltaLon = ((position.longitude - lastPosition!.longitude) * 1000000).round();
+
+                  print('🔀 Consecutive delta: (Δlat: $deltaLat, Δlon: $deltaLon)');
+
+                  // Store delta point
+                  _webDeltaPoints.add({
+                    'dlat': deltaLat,
+                    'dlon': deltaLon,
+                    'dt': 2000, // 2 seconds interval
+                    't': DateTime.now().toIso8601String(),
+                    'p': _pointCounter,
+                    'speed_mph': speedMph,
+                    'accuracy': position.accuracy,
+                    'speed_source': position.speed != null ? 'gps' : 'calculated',
                   });
-                  await prefs.setInt('batch_counter', _batchCounter);
+
+                  print('📊 Delta point stored - Buffer size: ${_webDeltaPoints.length}/25');
+
+                  // Send batch when we have 25 points
+                  if (_webDeltaPoints.length >= 25) {
+                    print('📤 ========== WEB BATCH READY ==========');
+                    bool success = await _sendWebBatchToServer(prefs, userId, tripId);
+                    if (!success) {
+                      print('⚠️ Batch upload failed - will retry next cycle');
+                    }
+                  }
+                } else {
+                  print('⚠️ No previous position yet - skipping delta calculation');
                 }
               }
             }
@@ -627,21 +614,23 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         );
         
       } else {
-        // MOBILE PLATFORM: Use simple timer GPS (same as web - IT WORKS!)
-        print('📱 Mobile platform - using timer GPS tracking (like web)');
-        
-        // Get user data for batch sending
-        SharedPreferences prefs = await SharedPreferences.getInstance();
-        String? userDataJson = prefs.getString('user_data');
-        String userId = '';
-        if (userDataJson != null) {
-          Map<String, dynamic> userData = json.decode(userDataJson);
-          userId = userData['user_id'] ?? '';
-        }
+        // MOBILE PLATFORM: Timer-based GPS tracking (PROVEN TO WORK)
+        print('📱 ========== MOBILE PLATFORM GPS TRACKING ==========');
+        print('📱 Starting timer-based GPS tracking (foreground)');
 
-        // Start GPS polling timer - every 2 seconds (SAME AS WEB - IT WORKS!)
+        // Timer to update elapsed time every second
+        _elapsedTimeTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+          if (mounted && isTripStarted) {
+            setState(() {
+              _elapsedTime++;
+            });
+          }
+        });
+
+        // GPS POLLING TIMER - THIS ACTUALLY COLLECTS THE DATA
         _speedUpdateTimer = Timer.periodic(Duration(seconds: 2), (timer) async {
           if (!mounted || !isTripStarted) {
+            print('📱 Timer cancelled - trip stopped or widget unmounted');
             timer.cancel();
             return;
           }
@@ -649,100 +638,166 @@ class CurrentTripPageState extends State<CurrentTripPage> {
           print('📱 ========== MOBILE GPS POLL #$_pointCounter ==========');
 
           try {
+            print('📱 Requesting GPS position...');
             Position position = await Geolocator.getCurrentPosition(
               desiredAccuracy: LocationAccuracy.bestForNavigation,
             ).timeout(Duration(seconds: 5));
 
-            print('✅ GPS: Accuracy ${position.accuracy}m');
+            print('✅ GPS: Lat ${position.latitude}, Lon ${position.longitude}, Accuracy: ${position.accuracy}m');
 
-            // Calculate speed (same as web)
+            // Calculate speed
             double speedMph = 0.0;
             bool usedGpsSpeed = false;
 
-            if (position.speed != null && position.speed! >= 0) {
-              speedMph = position.speed! * 2.237;
+            if (position.speed != null && position.speed! > 0) {
+              speedMph = position.speed! * 2.237; // m/s to mph
               usedGpsSpeed = true;
+              print('📊 Mobile: GPS speed: ${speedMph.toStringAsFixed(1)} mph');
             } else if (lastPosition != null) {
               double distanceMeters = Geolocator.distanceBetween(
-                lastPosition!.latitude, lastPosition!.longitude,
-                position.latitude, position.longitude,
+                lastPosition!.latitude,
+                lastPosition!.longitude,
+                position.latitude,
+                position.longitude,
               );
-              double distanceMiles = distanceMeters * 0.000621371;
               double timeHours = 2.0 / 3600.0;
-              if (distanceMeters > 0.5) {
-                speedMph = distanceMiles / timeHours;
-              }
+              double distanceMiles = distanceMeters * 0.000621371;
+              speedMph = distanceMiles / timeHours;
+              print('📊 Mobile: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
             }
 
+            // Sanity check
             if (speedMph > 150) speedMph = currentSpeed;
 
-            // Calculate distance from last position (same as web)
+            // Calculate distance from last position
             double segmentDistance = 0.0;
             if (lastPosition != null) {
               double distanceMeters = Geolocator.distanceBetween(
-                lastPosition!.latitude, lastPosition!.longitude,
-                position.latitude, position.longitude,
+                lastPosition!.latitude,
+                lastPosition!.longitude,
+                position.latitude,
+                position.longitude,
               );
-              segmentDistance = distanceMeters * 0.000621371; // Convert meters to miles
-
-              // Only add distance if movement is significant (filter GPS drift)
-              if (segmentDistance > 0.001) { // Minimum 5.3 feet
-                _totalDistance += segmentDistance;
-              }
+              segmentDistance = distanceMeters * 0.000621371;
+              print('📏 Mobile: Distance this segment: ${(segmentDistance * 5280).toStringAsFixed(1)} feet');
+            } else {
+              print('📏 Mobile: First point - no previous position');
             }
 
-            // UPDATE UI - THIS WORKS! (same as web)
+            // UPDATE STATE - THIS IS CRITICAL
             setState(() {
               currentSpeed = speedMph;
-              if (speedMph > maxSpeed) maxSpeed = speedMph;
+              if (speedMph > maxSpeed) {
+                maxSpeed = speedMph;
+              }
               _pointCounter++;
+
+              // Accumulate distance
+              if (segmentDistance > 0.001) {
+                _totalDistance += segmentDistance;
+                print('✅ Mobile: Distance accumulated. Total: ${_totalDistance.toStringAsFixed(3)} mi');
+              } else if (segmentDistance > 0) {
+                print('⏸️ Mobile: Segment too small, filtered GPS drift');
+              }
             });
 
             lastPosition = position;
 
-            // Save distance to SharedPreferences
+            // Store in SharedPreferences
+            await prefs.setDouble('current_speed', speedMph);
+            await prefs.setDouble('max_speed', maxSpeed);
+            await prefs.setInt('point_counter', _pointCounter);
             await prefs.setDouble('total_distance', _totalDistance);
 
-            // Calculate and store deltas
-            if (userDataJson != null) {
+            // ========== PRIVACY-PRESERVING CONSECUTIVE DELTA CALCULATION ==========
+            // Following GeoSecure-R methodology from research papers
+            String? userDataJson = prefs.getString('user_data');
+            String? tripId = prefs.getString('current_trip_id');
+
+            if (userDataJson != null && tripId != null) {
               Map<String, dynamic> userData = json.decode(userDataJson);
               if (userData['base_point'] != null) {
-                double baseLat = (userData['base_point']['latitude'] ?? 0.0).toDouble();
-                double baseLon = (userData['base_point']['longitude'] ?? 0.0).toDouble();
+                // Load or initialize first actual point for this trip
+                String? firstPointJson = prefs.getString('first_actual_point_$tripId');
+                Map<String, double>? firstActualPoint;
 
-                int deltaLat = ((position.latitude - baseLat) * 1000000).round();
-                int deltaLon = ((position.longitude - baseLon) * 1000000).round();
+                if (firstPointJson != null) {
+                  firstActualPoint = Map<String, double>.from(json.decode(firstPointJson));
+                }
 
-                _webDeltaPoints.add({
-                  'dlat': deltaLat,
-                  'dlon': deltaLon,
-                  'dt': 2000,
-                  't': DateTime.now().toIso8601String(),
-                  'p': _pointCounter,
-                  'speed_mph': speedMph,
-                  'accuracy': position.accuracy,
-                  'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
-                });
+                // If this is the FIRST point of the trip, store it locally
+                if (firstActualPoint == null) {
+                  firstActualPoint = {
+                    'latitude': position.latitude,
+                    'longitude': position.longitude,
+                  };
+                  await prefs.setString('first_actual_point_$tripId', json.encode(firstActualPoint));
 
-                print('📊 Point #$_pointCounter - Delta: ($deltaLat, $deltaLon), Speed: ${speedMph.toStringAsFixed(1)} mph');
-                print('📊 Buffer: ${_webDeltaPoints.length}/25 points');
+                  print('🎯 FIRST POINT stored locally (NEVER sent to server)');
+                  print('🔐 Privacy: Server only knows zipcode region');
 
-                // Send batch at 25 points
-                if (_webDeltaPoints.length >= 25) {
-                  print('📤 Batch ready - sending to server');
-                  await _sendWebBatchToServer(prefs, userId, tripId);
-                  setState(() {
-                    _batchCounter++;
+                  // Don't send data for first point
+                  lastPosition = position;
+                  return;
+                }
+
+                // Calculate CONSECUTIVE delta from last position
+                if (lastPosition != null) {
+                  int deltaLat = ((position.latitude - lastPosition!.latitude) * 1000000).round();
+                  int deltaLon = ((position.longitude - lastPosition!.longitude) * 1000000).round();
+
+                  print('🔀 Consecutive delta: (Δlat: $deltaLat, Δlon: $deltaLon)');
+
+                  // Store delta point
+                  _webDeltaPoints.add({
+                    'dlat': deltaLat,
+                    'dlon': deltaLon,
+                    'dt': 2000,
+                    't': DateTime.now().toIso8601String(),
+                    'p': _pointCounter,
+                    'speed_mph': speedMph,
+                    'accuracy': position.accuracy,
+                    'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
                   });
-                  await prefs.setInt('batch_counter', _batchCounter);
+
+                  print('📊 Delta point stored - Buffer size: ${_webDeltaPoints.length}/25');
+
+                  // Send batch when we have 25 points
+                  if (_webDeltaPoints.length >= 25) {
+                    print('📤 ========== MOBILE BATCH READY ==========');
+                    bool success = await _sendWebBatchToServer(prefs, userId, tripId);
+                    if (!success) {
+                      print('⚠️ Batch upload failed - will retry next cycle');
+                    }
+                  }
+                } else {
+                  print('⚠️ No previous position yet - skipping delta calculation');
                 }
               }
             }
 
+            print('✅ Mobile tracking - Point #$_pointCounter collected');
+            print('✅ Speed: ${speedMph.toStringAsFixed(1)} mph, Max: ${maxSpeed.toStringAsFixed(1)} mph');
+            print('📱 ========== MOBILE GPS POLL #$_pointCounter END ==========');
+
           } catch (e) {
-            print('❌ GPS error: $e');
+            print('❌ ========== MOBILE GPS ERROR ==========');
+            print('❌ Error getting location: $e');
+
+            if (e.toString().contains('TimeoutException')) {
+              print('⏰ GPS timeout - may be indoors or GPS warming up');
+            } else if (e.toString().contains('permission')) {
+              print('❌ Location permission issue');
+            }
+
+            print('📱 ========== MOBILE GPS POLL #$_pointCounter END (ERROR) ==========');
           }
         });
+
+        print('✅ ========== MOBILE GPS TRACKING ACTIVE ==========');
+        print('📱 GPS polling active - timer triggers every 2 seconds');
+        print('📱 UI updates directly via setState()');
+        print('📱 Points will increment as you move');
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -751,6 +806,16 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             duration: Duration(seconds: 2),
           ),
         );
+
+        // OPTIONAL: Try to initialize background tracking for when app is minimized
+        try {
+          await BackgroundLocationHandler.initialize();
+          await BackgroundLocationHandler.startTracking();
+          print('✅ Background tracking also enabled (will activate when app is backgrounded)');
+        } catch (e) {
+          print('⚠️ Background tracking not available: $e');
+          print('📱 Foreground tracking will work fine');
+        }
       }
     } else {
       print('❌ Invalid location permission: $permission');
@@ -806,19 +871,31 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         String userId = userData['user_id'] ?? '';
 
         print('📤 Sending final batch with ${_webDeltaPoints.length} remaining points');
-        await _sendWebBatchToServer(prefs, userId, tripId);
-        // Increment batch counter for the final incomplete batch
-        setState(() {
-          _batchCounter++;
-        });
-        await prefs.setInt('batch_counter', _batchCounter);
+        bool success = await _sendWebBatchToServer(prefs, userId, tripId);
+        if (success) {
+          print('✅ Final batch uploaded successfully');
+        } else {
+          print('⚠️ Final batch upload failed');
+        }
       }
 
       print('🌐 Web tracking stopped');
     } else {
-      // Mobile platform - stop foreground service
-      print('📱 Stopping mobile foreground service');
-      await FlutterForegroundTask.stopService();
+      // Mobile platform - stop timers and background tracking
+      print('📱 ========== STOPPING MOBILE TRACKING ==========');
+      print('📱 Stopping GPS tracking timers...');
+      _speedUpdateTimer?.cancel();
+      _elapsedTimeTimer?.cancel();
+      print('✅ Timers stopped');
+
+      // Also stop background tracking if it was started
+      try {
+        await BackgroundLocationHandler.stopTracking();
+        print('✅ Background location tracking stopped');
+      } catch (e) {
+        print('⚠️ Background tracking stop: $e');
+      }
+      print('📱 ========== MOBILE TRACKING STOPPED ==========');
     }
 
     // Check network connection
@@ -857,11 +934,17 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         durationMinutes = 0.5; // Minimum 30 seconds
       }
 
+      // 🕐 TIMEZONE FIX: Convert timestamps to UTC explicitly
+      // This ensures backend receives UTC time, which it then stores correctly
+      // When displaying, frontend converts back to user's local time
+      String startTimestampUtc = startTime.toUtc().toIso8601String();
+      String endTimestampUtc = endTime.toUtc().toIso8601String();
+
       Map<String, dynamic> finalizeData = {
         'user_id': userId,
         'trip_id': tripId,
-        'start_timestamp': tripStartTime,
-        'end_timestamp': endTime.toIso8601String(),
+        'start_timestamp': startTimestampUtc, // 🕐 FIXED: Send as UTC with explicit conversion
+        'end_timestamp': endTimestampUtc, // 🕐 FIXED: Send as UTC with explicit conversion
         'trip_quality': {
           'use_gps_metrics': true,
           'gps_max_speed_mph': maxSpeed,
@@ -875,7 +958,21 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         }
       };
       
-      print('📊 Finalizing trip: $tripId with $_pointCounter points');
+      print('📊 ========== FINALIZING TRIP ==========');
+      print('📊 Trip ID: $tripId');
+      print('📊 UI state at finalization:');
+      print('   - Points collected (_pointCounter): $_pointCounter');
+      print('   - Current speed: ${currentSpeed.toStringAsFixed(1)} mph');
+      print('   - Max speed: ${maxSpeed.toStringAsFixed(1)} mph');
+      print('   - Total distance: ${_totalDistance.toStringAsFixed(3)} mi');
+      print('   - Batches uploaded: $_batchCounter');
+      print('   - Duration: ${durationMinutes.toStringAsFixed(1)} minutes');
+      print('🕐 TIMEZONE INFO:');
+      print('   - Local start time: $startTime');
+      print('   - Local end time: $endTime');
+      print('   - UTC start time: $startTimestampUtc');
+      print('   - UTC end time: $endTimestampUtc');
+      print('📊 ========== TRIP FINALIZATION DATA ==========');
       
       try {
         // Try to finalize trip with retry logic
@@ -896,35 +993,34 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             if (response.statusCode == 200) {
               finalized = true;
               print('✅ Trip finalized successfully');
-              
-              // Clear trip data
-              await prefs.remove('current_trip_id');
-              await prefs.remove('trip_start_time');
-              await prefs.setInt('batch_counter', 0);
-              await prefs.setDouble('max_speed', 0.0);
-              await prefs.setInt('point_counter', 0);
-              await prefs.setDouble('current_speed', 0.0);
-              
+
+              // CRITICAL FIX: Use _clearTripData() to ensure complete cleanup
+              await _clearTripData(prefs);
+
               // Reset UI state
-              setState(() {
-                maxSpeed = 0.0;
-                currentSpeed = 0.0;
-                _pointCounter = 0;
-                _elapsedTime = 0;
-                _totalDistance = 0.0; // Reset distance
-                _batchCounter = 0; // Reset batch counter
-                lastPosition = null;
-                _webDeltaPoints.clear(); // Clear web delta buffer
-                _webBatchCounter = 0; // Reset batch counter
-              });
-              
-              // Show success message
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Trip saved successfully!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              if (mounted) {
+                setState(() {
+                  maxSpeed = 0.0;
+                  currentSpeed = 0.0;
+                  _pointCounter = 0;
+                  _elapsedTime = 0;
+                  _totalDistance = 0.0;
+                  _batchCounter = 0;
+                  lastPosition = null;
+                  _webDeltaPoints.clear();
+                  _webBatchCounter = 0;
+                  isTripStarted = false; // CRITICAL: Reset trip started flag
+                  tripStartTime = null;
+                });
+
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Trip saved successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             } else {
               print('❌ Finalization failed with status: ${response.statusCode}');
               print('Response body: ${response.body}');
@@ -971,7 +1067,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
     setState(() {});
   }
 
-  Future<void> _sendWebBatchToServer(SharedPreferences prefs, String userId, String tripId) async {
+  Future<bool> _sendWebBatchToServer(SharedPreferences prefs, String userId, String tripId) async {
     print('🌐 ========== SENDING WEB BATCH TO SERVER ==========');
 
     _webBatchCounter++;
@@ -1042,18 +1138,27 @@ class CurrentTripPageState extends State<CurrentTripPage> {
         // Clear the batch after successful upload
         _webDeltaPoints.clear();
         print('📦 Buffer cleared, ready for next batch');
+
+        // Increment batch counter ONLY on successful upload
+        setState(() {
+          _batchCounter++;
+        });
+        await prefs.setInt('batch_counter', _batchCounter);
+        print('✅ Batch counter incremented to $_batchCounter');
+
+        return true; // Success
       } else {
         print('❌ ========== WEB BATCH UPLOAD FAILED ==========');
         print('❌ Batch upload failed: ${response.statusCode}');
         print('❌ Response body: ${response.body}');
+        return false; // Failed
       }
     } catch (e, stackTrace) {
       print('❌ ========== WEB BATCH UPLOAD ERROR ==========');
       print('❌ Batch upload error: $e');
       print('❌ Stack trace: $stackTrace');
+      return false; // Error
     }
-
-    print('🌐 ========== WEB BATCH SEND COMPLETE ==========');
   }
 
   void _showErrorDialog(String title, String message) {
@@ -1124,7 +1229,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
       canPop: !isTripStarted, // Can only navigate away when trip is NOT active
       onPopInvoked: (bool didPop) {
         if (didPop) return; // If pop already happened, do nothing
-        
+
         // If user tried to leave during active trip
         if (isTripStarted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,7 +1,6 @@
 import Flutter
 import UIKit
 import CoreLocation
-import flutter_foreground_task
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -14,13 +13,7 @@ import flutter_foreground_task
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
-    // CRITICAL: Register the plugin registrant callback for foreground task
-    // This allows the background service to access all Flutter plugins (especially geolocator)
-    SwiftFlutterForegroundTaskPlugin.setPluginRegistrantCallback { registry in
-      GeneratedPluginRegistrant.register(with: registry)
-    }
-
-    // Configure iOS-specific background location settings
+    // Configure iOS-specific background location settings for background_locator_2
     configureBackgroundLocationTracking()
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

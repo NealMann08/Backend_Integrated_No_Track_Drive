@@ -38,50 +38,63 @@ class _AppearancePageState extends State<AppearancePage> {
         child: SettingsScreen(
           title: 'Appearance',
           children: <Widget>[
-            SettingsGroup(
-              title: 'Display Options',
-              children: [
-                SwitchSettingsTile(
-                  settingKey: 'dark_mode',
-                  title: 'Dark Mode',
-                  subtitle: 'Reduce eye strain in low light',
-                  leading: Icon(Icons.dark_mode),
-                  defaultValue: false,
-                  onChange: (enabled) {
-                    // TODO: Toggle theme mode here if you're using a theme provider
-                  },
+            Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text(
+                'Appearance customization features are currently under development and will be available in a future update.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
                 ),
-                DropDownSettingsTile(
-                  settingKey: 'font_size',
-                  title: 'Font Size',
-                  subtitle: 'Choose a comfortable font size',
-                  selected: 1,
-                  values: <int, String>{
-                    0: 'Small',
-                    1: 'Medium',
-                    2: 'Large',
-                  },
-                  onChange: (value) {
-                    // TODO: Apply font size change
-                  },
-                ),
-                DropDownSettingsTile(
-                  settingKey: 'accent_color',
-                  title: 'Accent Color',
-                  subtitle: 'Customize the app color',
-                  selected: 'Blue',
-                  values: <String, String>{
-                    'Blue': 'Blue',
-                    'Green': 'Green',
-                    'Purple': 'Purple',
-                    'Red': 'Red',
-                  },
-                  onChange: (value) {
-                    // TODO: Update accent color
-                  },
-                ),
-              ],
+                textAlign: TextAlign.center,
+              ),
             ),
+            // DISABLED: Theme customization not implemented
+            // SettingsGroup(
+            //   title: 'Display Options',
+            //   children: [
+            //     SwitchSettingsTile(
+            //       settingKey: 'dark_mode',
+            //       title: 'Dark Mode',
+            //       subtitle: 'Reduce eye strain in low light',
+            //       leading: Icon(Icons.dark_mode),
+            //       defaultValue: false,
+            //       onChange: (enabled) {
+            //         // TODO: Toggle theme mode here if you're using a theme provider
+            //       },
+            //     ),
+            //     DropDownSettingsTile(
+            //       settingKey: 'font_size',
+            //       title: 'Font Size',
+            //       subtitle: 'Choose a comfortable font size',
+            //       selected: 1,
+            //       values: <int, String>{
+            //         0: 'Small',
+            //         1: 'Medium',
+            //         2: 'Large',
+            //       },
+            //       onChange: (value) {
+            //         // TODO: Apply font size change
+            //       },
+            //     ),
+            //     DropDownSettingsTile(
+            //       settingKey: 'accent_color',
+            //       title: 'Accent Color',
+            //       subtitle: 'Customize the app color',
+            //       selected: 'Blue',
+            //       values: <String, String>{
+            //         'Blue': 'Blue',
+            //         'Green': 'Green',
+            //         'Purple': 'Purple',
+            //         'Red': 'Red',
+            //       },
+            //       onChange: (value) {
+            //         // TODO: Update accent color
+            //       },
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       );

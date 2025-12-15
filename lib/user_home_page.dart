@@ -476,22 +476,13 @@ class _UserHomePageState extends State<UserHomePage> {
                     }
                     
                     String userId = userData['user_id'] ?? '';
-                    
-                    // Generate new trip ID
-                    int timestamp = DateTime.now().millisecondsSinceEpoch;
-                    int randomNum = Random().nextInt(999999);
-                    String tripId = 'trip_${userId}_${timestamp}_$randomNum';
-                    
-                    // Store trip info
-                    await prefs.setString('current_trip_id', tripId);
-                    await prefs.setString('trip_start_time', DateTime.now().toIso8601String());
-                    await prefs.setInt('batch_counter', 0);
-                    await prefs.setDouble('max_speed', 0.0);
-                    
-                    print('✅ New trip started: $tripId');
+
+                    print('✅ Navigating to trip page (trip will start when user clicks "Start Trip")');
                     print('Base point: ${userData['base_point']['city']}, ${userData['base_point']['state']}');
-                    
+
                     // Navigate to current trip page
+                    // NOTE: Trip ID and tracking data will be created when user clicks
+                    // the green "Start Trip" button on the trip page
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => CurrentTripPage()),
