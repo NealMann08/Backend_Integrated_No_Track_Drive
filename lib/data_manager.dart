@@ -1,13 +1,30 @@
+/*
+ * Data Manager
+ *
+ * Handles caching of driver analytics data to reduce API calls and improve
+ * app performance. This was a big optimization because the analytics endpoint
+ * takes a while to respond, and we don't want users waiting every time they
+ * switch screens.
+ *
+ * Important security note: The cache is tied to a specific user ID to prevent
+ * data leakage when switching accounts on a shared device.
+ */
+
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 class DataManager {
+  // In-memory cache for quick access
   static Map<String, dynamic>? _cachedAnalytics;
   static DateTime? _lastFetchTime;
-  static String? _cachedUserId; // 🔐 SECURITY FIX: Track which user's data is cached
-  static const Duration _cacheValidity = Duration(hours: 1); // Cache for 1 hour
+  static String? _cachedUserId;
 
+  // How long to keep cached data before refreshing
+  static const Duration _cacheValidity = Duration(hours: 1);
+
+  /// Fetches driver analytics from the backend, using cache when possible
+  /// Set forceRefresh to true to bypass cache and get fresh data
   static Future<Map<String, dynamic>?> getDriverAnalytics({bool forceRefresh = false}) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -21,24 +38,22 @@ class DataManager {
 
       if (userEmail.isEmpty) return null;
 
-      // 🔐 CRITICAL FIX: Check if cached data belongs to current user
-      // If user changed, clear cache immediately to prevent data leakage
+      // Security check: make sure cached data belongs to current user
+      // This prevents showing another user's data if someone logs out/in
       if (_cachedUserId != null && _cachedUserId != userId) {
-        print('⚠️ User changed (cached: $_cachedUserId, current: $userId) - clearing cache');
         clearCache();
       }
 
-      // Return cached data if valid and not forcing refresh AND same user
+      // Use cache if it's still valid and belongs to current user
       if (!forceRefresh &&
           _cachedAnalytics != null &&
           _lastFetchTime != null &&
           _cachedUserId == userId &&
           DateTime.now().difference(_lastFetchTime!) < _cacheValidity) {
-        print('📦 Using cached analytics for user: $userId');
         return _cachedAnalytics;
       }
-      
-      print('🌐 Fetching analytics for user: $userId');
+
+      // Fetch fresh data from the API
       final response = await http.get(
         Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=$userEmail'),
       );
@@ -46,56 +61,48 @@ class DataManager {
       if (response.statusCode == 200) {
         _cachedAnalytics = json.decode(response.body);
         _lastFetchTime = DateTime.now();
-        _cachedUserId = userId; // 🔐 SECURITY FIX: Store which user this cache belongs to
+        _cachedUserId = userId;
 
-        // Also save to SharedPreferences for persistence
+        // Save to persistent storage so it survives app restarts
         await prefs.setString('cached_analytics', json.encode(_cachedAnalytics));
         await prefs.setString('analytics_cache_time', _lastFetchTime!.toIso8601String());
-        await prefs.setString('analytics_cache_user_id', userId); // 🔐 Save user_id with cache
+        await prefs.setString('analytics_cache_user_id', userId);
 
-        print('✅ Analytics cached for user: $userId');
         return _cachedAnalytics;
-      } else {
-        print('❌ Failed to fetch analytics: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching analytics: $e');
-
-      // Try to load from persistent cache if network fails
+      // If network fails, try to use persistent cache as fallback
       SharedPreferences prefs = await SharedPreferences.getInstance();
       String? cached = prefs.getString('cached_analytics');
       String? cachedUserId = prefs.getString('analytics_cache_user_id');
       String? userDataJson = prefs.getString('user_data');
 
-      // 🔐 SECURITY FIX: Validate cached data belongs to current user
+      // Only use fallback cache if it belongs to current user
       if (cached != null && userDataJson != null) {
         Map<String, dynamic> userData = json.decode(userDataJson);
         String currentUserId = userData['user_id'] ?? '';
 
         if (cachedUserId == currentUserId) {
-          print('📦 Using persistent cache for user: $currentUserId');
           _cachedAnalytics = json.decode(cached);
           _cachedUserId = currentUserId;
           return _cachedAnalytics;
-        } else {
-          print('⚠️ Persistent cache belongs to different user - ignoring');
         }
       }
     }
 
     return null;
   }
-  
-  // Preload data when user logs in
+
+  /// Preloads data right after login so screens load faster
   static Future<void> preloadData() async {
     await getDriverAnalytics(forceRefresh: true);
   }
-  
-  // Clear cache on logout
+
+  /// Clears all cached data - call this on logout
   static void clearCache() {
-    print('🧹 Clearing DataManager cache');
     _cachedAnalytics = null;
     _lastFetchTime = null;
-    _cachedUserId = null; // 🔐 SECURITY FIX: Clear cached user ID
+    _cachedUserId = null;
   }
 }
+

@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'home_page.dart';
 import 'ipconfig.dart';
 import 'geocodingutils.dart';
+import 'isp_registration_page.dart';
 
 class LoginPageWidget extends StatefulWidget {
   const LoginPageWidget({super.key});
@@ -577,6 +578,9 @@ final _serverNumberController = TextEditingController();
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // ISP Registration Note
+                      _buildISPNote(context),
+                      const SizedBox(height: 16),
                       _buildHeader(),
                       const SizedBox(height: 32),
                       _buildTabBar(),
@@ -620,7 +624,7 @@ final _serverNumberController = TextEditingController();
         ),
         const SizedBox(height: 12),
         Text(
-          _isSignupMode 
+          _isSignupMode
               ? 'Fill in your details to get started'
               : 'Login to continue to your account',
           style: TextStyle(
@@ -629,6 +633,64 @@ final _serverNumberController = TextEditingController();
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildISPNote(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Color(0xFF1976D2).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Color(0xFF1976D2).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.business,
+            color: Color(0xFF1976D2),
+            size: 24,
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Are you an Insurance Service Provider?',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1976D2),
+                    fontSize: 14,
+                  ),
+                ),
+                SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ISPRegistrationPage()),
+                    );
+                  },
+                  child: Text(
+                    'Click here to learn how to register',
+                    style: TextStyle(
+                      color: Color(0xFF1976D2),
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.arrow_forward_ios,
+            color: Color(0xFF1976D2),
+            size: 16,
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,10 +1,16 @@
-// lib/geocoding_utils.dart
-// Dart port of TypeScript geocoding utility for Zippopotam API
+/*
+ * Geocoding Utilities
+ *
+ * Converts US zip codes to latitude/longitude coordinates using the
+ * free Zippopotam.us API. This is needed for the "base point" feature
+ * which allows us to store GPS data as deltas from a reference point
+ * for privacy (we never store the actual coordinates, just offsets).
+ */
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// City coordinates returned from geocoding
+/// Represents coordinates for a city/location
 class CityCoordinates {
   final double latitude;
   final double longitude;
@@ -45,55 +51,49 @@ class CityCoordinates {
   }
 }
 
-/// Ultimate fallback coordinates (Beijing)
+/// Default fallback coordinates if geocoding fails
 final CityCoordinates FALLBACK_COORDINATES = CityCoordinates(
   latitude: 39.913818,
   longitude: 116.363625,
-  city: 'Beijing',
-  state: 'CN',
+  city: 'Unknown',
+  state: 'US',
   zipcode: '',
   source: 'fallback',
 );
 
-/// Validate US zipcode format (5 digits or 5+4 format)
+/// Validates that a string is a valid US zipcode format
 bool validateZipcode(String zipcode) {
   final cleanZip = zipcode.trim();
+  // Matches 5 digits or 5+4 format (12345 or 12345-6789)
   return RegExp(r'^\d{5}(-\d{4})?$').hasMatch(cleanZip);
 }
 
-/// Clean and normalize zipcode (remove +4 extension)
+/// Removes the +4 extension from a zipcode if present
 String normalizeZipcode(String zipcode) {
   return zipcode.trim().split('-')[0];
 }
 
-/// Geocode using Zippopotam.us API
+/// Internal: Calls the Zippopotam API to get coordinates
 Future<CityCoordinates?> _geocodeWithZippopotam(String zipcode) async {
   try {
     final normalizedZip = normalizeZipcode(zipcode);
     final url = 'http://api.zippopotam.us/us/$normalizedZip';
-    
-    print('🌐 Calling Zippopotam API for $zipcode');
-    print('🌐 URL: $url');
-    
+
     final response = await http.get(
       Uri.parse(url),
       headers: {'Accept': 'application/json'},
     );
 
-    print('🌐 Response status: ${response.statusCode}');
-
     if (response.statusCode != 200) {
-      print('❌ API error: ${response.statusCode}');
       return null;
     }
 
     final data = json.decode(response.body) as Map<String, dynamic>;
-    print('📍 Raw API response: ${json.encode(data)}');
-    
+
     if (data['places'] != null && (data['places'] as List).isNotEmpty) {
       final place = (data['places'] as List)[0] as Map<String, dynamic>;
-      
-      final result = CityCoordinates(
+
+      return CityCoordinates(
         latitude: double.parse(place['latitude'].toString()),
         longitude: double.parse(place['longitude'].toString()),
         city: place['place name'] as String,
@@ -101,27 +101,20 @@ Future<CityCoordinates?> _geocodeWithZippopotam(String zipcode) async {
         zipcode: normalizedZip,
         source: 'zippopotam',
       );
-
-      print('✅ Geocoding successful: ${result.city}, ${result.state}');
-      return result;
     }
 
-    print('❌ No places found for $zipcode');
     return null;
 
   } catch (error) {
-    print('❌ Geocoding error for $zipcode: $error');
     return null;
   }
 }
 
-/// Main function: Get exact city center coordinates from zipcode
+/// Main function: Gets coordinates for a US zipcode
+/// Returns fallback coordinates if the API call fails
 Future<CityCoordinates> getCityCoordinatesFromZipcode(String zipcode) async {
-  print('\n🎯 ===== GETTING COORDINATES FOR ZIPCODE: $zipcode =====');
-
-  // Step 1: Validate zipcode format
+  // Validate format first
   if (!validateZipcode(zipcode)) {
-    print('❌ Invalid zipcode format: $zipcode');
     return CityCoordinates(
       latitude: FALLBACK_COORDINATES.latitude,
       longitude: FALLBACK_COORDINATES.longitude,
@@ -134,14 +127,11 @@ Future<CityCoordinates> getCityCoordinatesFromZipcode(String zipcode) async {
 
   final normalizedZip = normalizeZipcode(zipcode);
 
-  // Step 2: Get exact coordinates from Zippopotam API
-  print('🔄 Looking up exact city center for $normalizedZip...');
+  // Try the API
   CityCoordinates? coordinates = await _geocodeWithZippopotam(normalizedZip);
 
-  // Step 3: Use fallback if API fails
+  // Use fallback if API fails
   if (coordinates == null) {
-    print('⚠️ Could not find coordinates for zipcode $zipcode');
-    print('🔄 Using Beijing fallback as last resort');
     coordinates = CityCoordinates(
       latitude: FALLBACK_COORDINATES.latitude,
       longitude: FALLBACK_COORDINATES.longitude,
@@ -152,20 +142,17 @@ Future<CityCoordinates> getCityCoordinatesFromZipcode(String zipcode) async {
     );
   }
 
-  // PRIVACY: Do not log base coordinates
-  print('✅ Final base point: ${coordinates.city}, ${coordinates.state}');
   return coordinates;
 }
 
-/// Calculate delta coordinates from actual GPS position and base point
-/// Returns a map with delta_lat and delta_long as fixed-point integers (multiplied by 1,000,000)
+/// Calculates delta (offset) coordinates from an actual position and base point
+/// Returns integers multiplied by 1,000,000 for precision without floating point issues
 Map<String, int> calculateDeltaCoordinates({
   required double actualLatitude,
   required double actualLongitude,
   required double baseLatitude,
   required double baseLongitude,
 }) {
-  // Calculate deltas and multiply by 1,000,000 for fixed-point precision
   int deltaLat = ((actualLatitude - baseLatitude) * 1000000).round();
   int deltaLong = ((actualLongitude - baseLongitude) * 1000000).round();
 
@@ -175,15 +162,13 @@ Map<String, int> calculateDeltaCoordinates({
   };
 }
 
-/// Reconstruct actual coordinates from delta coordinates and base point
-/// Deltas should be fixed-point integers (multiplied by 1,000,000)
+/// Reconstructs actual coordinates from delta values and a base point
 Map<String, double> reconstructCoordinates({
   required int deltaLat,
   required int deltaLong,
   required double baseLatitude,
   required double baseLongitude,
 }) {
-  // Divide by 1,000,000 to convert from fixed-point integers to decimals
   double actualLat = baseLatitude + (deltaLat / 1000000);
   double actualLong = baseLongitude + (deltaLong / 1000000);
 
@@ -193,7 +178,7 @@ Map<String, double> reconstructCoordinates({
   };
 }
 
-/// Format delta coordinates for display (privacy-safe)
+/// Formats delta coordinates for display (privacy-safe)
 String formatDeltaCoordinates(int deltaLat, int deltaLong) {
-  return 'Δ(${deltaLat}, ${deltaLong})';
+  return 'Δ($deltaLat, $deltaLong)';
 }

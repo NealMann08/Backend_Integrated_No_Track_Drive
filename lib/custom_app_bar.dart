@@ -1,19 +1,26 @@
+/*
+ * Custom App Bar & Navigation
+ *
+ * This handles both the top app bar and bottom navigation for the app.
+ * It's smart enough to show different navigation options based on whether
+ * the user is a regular driver, insurance provider, or admin.
+ *
+ * One tricky part: we block navigation if there's an active trip recording.
+ * This prevents users from accidentally leaving mid-trip and losing their data.
+ */
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Importing all the necessary pages that this app bar will navigate to
 import 'home_page.dart';
 import 'previous_trips_page.dart';
 import 'score_page.dart';
 import 'settings_page.dart';
 
-/// A custom AppBar widget that also implements PreferredSizeWidget to ensure proper sizing.
-/// This widget handles both the top app bar and bottom navigation bar functionality.
-/// It dynamically changes based on the user's role (admin, insurance, or regular user).
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final int selectedIndex; // The currently selected tab index
-  final Function(int) onItemTapped; // Callback when a tab is selected
-  final String role; // User role ('admin', 'insurance', or default user)
+  final int selectedIndex;
+  final Function(int) onItemTapped;
+  final String role;
 
   const CustomAppBar({
     super.key,
@@ -25,16 +32,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: Text(_getAppBarTitle(selectedIndex)), // Dynamic title based on role and selected index
+      title: Text(_getAppBarTitle(selectedIndex)),
       centerTitle: true,
       backgroundColor: Colors.blue,
     );
   }
 
   @override
-  Size get preferredSize => Size.fromHeight(kToolbarHeight); // Standard app bar height
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
-  /// Returns the appropriate app bar title based on the user's role and selected index
+  // Returns the right title based on user role and current tab
   String _getAppBarTitle(int index) {
     if (role == 'insurance') {
       switch (index) {
@@ -52,7 +59,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         case 3: return "Account";
         default: return "Dashboard";
       }
-    } else { // Default case for regular users
+    } else {
+      // Regular user
       switch (index) {
         case 0: return "Home";
         case 1: return "Previous Trips";
@@ -63,30 +71,35 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     }
   }
 
-  /// Builds the navigation items for admin users
+  // Navigation items for admin dashboard
   List<BottomNavigationBarItem> _buildAdminNavItems() {
-    return [
-      BottomNavigationBarItem(
-        icon: Icon(Icons.dashboard),
-        label: 'Dashboard',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.person_search),
-        label: 'Users',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.business),
-        label: 'Insurance',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.account_circle),
-        label: 'Account',
-      ),
+    return const [
+      BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+      BottomNavigationBarItem(icon: Icon(Icons.person_search), label: 'Users'),
+      BottomNavigationBarItem(icon: Icon(Icons.business), label: 'Insurance'),
+      BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: 'Account'),
     ];
   }
 
-  /// Builds and returns the bottom navigation bar widget
-  /// Handles tap events and navigation between pages
+  // Navigation items for insurance providers
+  List<BottomNavigationBarItem> _buildInsuranceNavItems() {
+    return const [
+      BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+      BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+    ];
+  }
+
+  // Navigation items for regular drivers
+  List<BottomNavigationBarItem> _buildUserNavItems() {
+    return const [
+      BottomNavigationBarItem(icon: Icon(Icons.directions_car), label: 'Home'),
+      BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Previous Trips'),
+      BottomNavigationBarItem(icon: Icon(Icons.star), label: 'Score'),
+      BottomNavigationBarItem(icon: Icon(Icons.account_circle), label: 'Account'),
+    ];
+  }
+
+  /// Builds the bottom navigation bar with role-appropriate items
   Widget buildBottomNavBar(BuildContext context) {
     return BottomNavigationBar(
       currentIndex: selectedIndex,
@@ -94,8 +107,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       selectedItemColor: Colors.blue,
       unselectedItemColor: Colors.grey,
       onTap: (index) {
-        onItemTapped(index); // Update the selected index
-        _navigateToPage(context, index); // Navigate to the corresponding page
+        onItemTapped(index);
+        _navigateToPage(context, index);
       },
       items: role == 'insurance'
           ? _buildInsuranceNavItems()
@@ -105,120 +118,59 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  /// Builds the navigation items for insurance users
-  /// Insurance providers only have Dashboard and Settings
-  List<BottomNavigationBarItem> _buildInsuranceNavItems() {
-    return [
-      BottomNavigationBarItem(
-        icon: Icon(Icons.dashboard),
-        label: 'Dashboard',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.settings),
-        label: 'Settings',
-      ),
-    ];
-  }
-
-  /// Builds the navigation items for regular users
-  List<BottomNavigationBarItem> _buildUserNavItems() {
-    return [
-      BottomNavigationBarItem(
-        icon: Icon(Icons.directions_car),
-        label: 'Home',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.history),
-        label: 'Previous Trips',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.star),
-        label: 'Score',
-      ),
-      BottomNavigationBarItem(
-        icon: Icon(Icons.account_circle),
-        label: 'Account',
-      ),
-    ];
-  }
-
-  /// Handles navigation to different pages based on the selected index and user role
+  /// Handles navigation between pages
+  /// Blocks navigation if there's an active trip to prevent data loss
   Future<void> _navigateToPage(BuildContext context, int index) async {
-    // CRITICAL: Check if there's an active trip before allowing navigation
-    // This prevents users from leaving the current trip page while tracking is active
     final prefs = await SharedPreferences.getInstance();
     final activeTripId = prefs.getString('current_trip_id');
     final tripStartTime = prefs.getString('trip_start_time');
 
-    // Cache context check before async operations
     if (!context.mounted) return;
 
-    // If there's an active trip, block navigation and show warning
+    // Check if there's an active trip that's not too old (within 4 hours)
     if (activeTripId != null && activeTripId.isNotEmpty && tripStartTime != null) {
-      // Check if the trip is recent (within last 4 hours - not abandoned)
       final startTime = DateTime.parse(tripStartTime);
       final timeSinceStart = DateTime.now().difference(startTime);
 
       if (timeSinceStart.inHours <= 4) {
-        // Active trip detected - prevent navigation
+        // Active trip - don't let them navigate away
         if (!context.mounted) return;
 
-        // CRITICAL FIX: Don't provide "Go to Trip" button as it creates a NEW CurrentTripPage
-        // This would kill the active trip state and freeze the data
-        // User should stop the trip manually instead
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
-                SizedBox(width: 12),
+                const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Trip in Progress',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                    children: const [
+                      Text('Trip in Progress',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       SizedBox(height: 4),
-                      Text(
-                        'Stop your trip before navigating',
-                        style: TextStyle(fontSize: 14),
-                      ),
+                      Text('Stop your trip before navigating', style: TextStyle(fontSize: 14)),
                     ],
                   ),
                 ),
               ],
             ),
             backgroundColor: Colors.orange.shade700,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
         return; // Block navigation
       }
     }
 
+    // Determine which page to navigate to based on role and index
     Widget page;
 
     if (role == 'insurance') {
-      // Insurance users only have Dashboard and Settings
-      switch (index) {
-        case 0:
-          page = HomePage(role: role);  // Dashboard (Insurance Home Page)
-          break;
-        case 1:
-          page = SettingsPage();  // Settings
-          break;
-        default:
-          return;
-      }
-    } else if(role == 'admin'){
       switch (index) {
         case 0:
           page = HomePage(role: role);
@@ -226,16 +178,19 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         case 1:
           page = SettingsPage();
           break;
-        case 2:
-          page = SettingsPage();
-          break;
-        case 3:
-          page = SettingsPage();
-          break;
         default:
           return;
       }
-    } else { // Default case for regular users
+    } else if (role == 'admin') {
+      switch (index) {
+        case 0:
+          page = HomePage(role: role);
+          break;
+        default:
+          page = SettingsPage();
+      }
+    } else {
+      // Regular user navigation
       switch (index) {
         case 0:
           page = HomePage(role: role);
@@ -254,10 +209,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       }
     }
 
-    // Check context is still mounted before navigation
     if (!context.mounted) return;
 
-    // Replace the current page with the new one (no back stack)
+    // Replace current page (no back stack buildup)
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => page),

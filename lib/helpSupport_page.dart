@@ -1,11 +1,6 @@
-import 'package:drive_guard/login_page.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_settings_screens/flutter_settings_screens.dart';
-
-
-
-
+import 'package:url_launcher/url_launcher.dart';
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -15,70 +10,154 @@ class HelpSupportPage extends StatefulWidget {
 }
 
 class _HelpSupportPageState extends State<HelpSupportPage> {
-  
+  final TextEditingController _messageController = TextEditingController();
+
   @override
-  void initState() {
-    super.initState();
-    // Verify user is authenticated
-    _checkAuthToken();
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
   }
 
-  // Checks if the user has a valid authentication token.
-  // If not, redirects to the login page.
-  Future<void> _checkAuthToken() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? token = prefs.getString('access_token');
+  void _showContactAdminDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.support_agent, color: Colors.blue.shade700),
+            SizedBox(width: 12),
+            Text('Contact Support'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Send a message to our support team about bugs, issues, or any feedback you have.',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: _messageController,
+                maxLines: 5,
+                decoration: InputDecoration(
+                  hintText: 'Describe your issue or feedback...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _messageController.clear();
+              Navigator.pop(context);
+            },
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (_messageController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please enter a message')),
+                );
+                return;
+              }
+
+              String message = _messageController.text.trim();
+              final Uri emailUri = Uri(
+                scheme: 'mailto',
+                path: 'admin@gmail.com',
+                query: 'subject=DriveGuard Support Request&body=${Uri.encodeComponent(message)}',
+              );
+
+              Navigator.pop(context);
+              _messageController.clear();
+
+              try {
+                if (await canLaunchUrl(emailUri)) {
+                  await launchUrl(emailUri);
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Message prepared. Email admin@gmail.com with your feedback.'),
+                        backgroundColor: Colors.blue,
+                        duration: Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please email admin@gmail.com with your feedback.'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Send Message'),
+          ),
+        ],
+      ),
+    );
   }
-  
-  
-   @override
+
+  @override
   Widget build(BuildContext context) => SimpleSettingsTile(
-    leading: Icon(Icons.headphones_outlined, color: Colors.black),
+    leading: Icon(Icons.help_outline, color: Colors.black),
     title: 'Help & Support',
     child: SettingsScreen(
       title: 'Help & Support',
       children: <Widget>[
         SettingsGroup(
-          title: 'Support Options',
+          title: 'Contact Us',
           children: [
             SimpleSettingsTile(
-              title: 'FAQs',
-              subtitle: 'Browse frequently asked questions',
-              leading: Icon(Icons.question_answer),
-              onTap: () {
-                // TODO: Navigate to FAQs screen or open a web page
-              },
-            ),
-            SimpleSettingsTile(
-              title: 'Contact Support',
-              subtitle: 'Get help from our team',
-              leading: Icon(Icons.support_agent),
-              onTap: () {
-                // TODO: Navigate to a contact form or open email intent
-              },
+              title: 'Report a Bug or Send Feedback',
+              subtitle: 'Send a message to our support team',
+              leading: Icon(Icons.bug_report, color: Colors.orange),
+              onTap: _showContactAdminDialog,
             ),
           ],
         ),
-        SettingsGroup(
-          title: 'Feedback',
-          children: [
-            SimpleSettingsTile(
-              title: 'Report a Bug',
-              subtitle: 'Let us know about issues you’re facing',
-              leading: Icon(Icons.bug_report),
-              onTap: () {
-                // TODO: Navigate to bug report form
-              },
+        SizedBox(height: 20),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade200),
             ),
-            SimpleSettingsTile(
-              title: 'Send Feedback',
-              subtitle: 'Help us improve your experience',
-              leading: Icon(Icons.feedback),
-              onTap: () {
-                // TODO: Navigate to feedback form
-              },
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue.shade700),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'For immediate assistance, you can also email us directly at admin@gmail.com',
+                    style: TextStyle(color: Colors.blue.shade900, fontSize: 13),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ],
     ),

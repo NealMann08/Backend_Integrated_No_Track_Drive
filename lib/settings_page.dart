@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:drive_guard/about_page.dart';
-import 'package:drive_guard/appearance_page.dart';
 import 'package:drive_guard/helpSupport_page.dart';
 import 'package:drive_guard/privacySecurity_page.dart';
 import 'package:flutter_settings_screens/flutter_settings_screens.dart';
@@ -9,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'custom_app_bar.dart';
 import 'home_page.dart';
 import 'login_page.dart';
-import 'account_page.dart';
 import 'notifications_page.dart';
 import 'data_manager.dart'; // Import DataManager for cache clearing
 
@@ -111,15 +108,10 @@ Widget build(BuildContext context) {
                           title: 'SETTINGS',
                           children: <Widget>[
                             const SizedBox(height: 8),
-                            AccountPage(),
                             NotificationsPage(),
-                            AppearancePage(),
                             PrivSecPage(),
                             HelpSupportPage(),
                             AboutPage(),
-                            // buildReviewDriving(context),
-                            // buildReportBug(context),
-                            // buildsendFeedback(context),
                             buildLogout(context),
                           ],
                         ),

@@ -1,399 +1,106 @@
-# Backend Cloudwatch Logs
-2025-12-05T01:45:05.235Z
-✅ CACHE HIT: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.275Z
-🔄 TRIP MODIFIED: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.275Z
-🔄 RE-ANALYZING modified trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.275Z
-🎯 ANALYZING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337 for user: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.275Z
-📖 Reading trip data from Trips-Neal table for: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.315Z
-📅 TIMESTAMPS FROM TRIPS-NEAL:
-2025-12-05T01:45:05.315Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.315Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.315Z
-Available keys in Trips-Neal: ['created_at', 'end_timestamp', 'start_timestamp', 'status', 'total_batches', 'trip_id', 'user_id', 'finalized_at', 'trip_quality']
-2025-12-05T01:45:05.315Z
-📱 Found FRONTEND VALUES for trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.315Z
-Frontend Distance: 0.000 miles
-2025-12-05T01:45:05.315Z
-Frontend Duration: 1.8 minutes
-2025-12-05T01:45:05.315Z
-Frontend Max Speed: 0.0 mph
-2025-12-05T01:45:05.315Z
-🔍 Getting batches for user: 32056518-4689-4f9b-b995-0641a89f53f8, trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.475Z
-✅ Found 2 batches for user 32056518-4689-4f9b-b995-0641a89f53f8, trip trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.475Z
-📦 Processing 2 batches
-2025-12-05T01:45:05.475Z
-Batch 1: 25 deltas
-2025-12-05T01:45:05.475Z
-Batch 2: 25 deltas
-2025-12-05T01:45:05.475Z
-📊 Total deltas to process: 50
-2025-12-05T01:45:05.475Z
-🚗 Processing 50 deltas
-2025-12-05T01:45:05.475Z
-📍 Base point: Dublin, CA
-2025-12-05T01:45:05.475Z
-📱 Using EXACT FRONTEND VALUES
-2025-12-05T01:45:05.475Z
-📊 FRONTEND VALUES:
-2025-12-05T01:45:05.475Z
-Distance: 0.000 miles
-2025-12-05T01:45:05.475Z
-Duration: 2m
-2025-12-05T01:45:05.475Z
-Max Speed: 0.0 mph
-2025-12-05T01:45:05.475Z
-Avg Speed: 0.0 mph
-2025-12-05T01:45:05.475Z
-⚠️ Stationary trip detected: 0.0 miles
-2025-12-05T01:45:05.475Z
-📊 Creating minimal analysis for stationary trip
-2025-12-05T01:45:05.475Z
-✅ Trip analysis complete: 0.0/100 (Stationary)
-2025-12-05T01:45:05.475Z
-✅ Added start_timestamp from Trips-Neal: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.475Z
-✅ Added end_timestamp from Trips-Neal: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.475Z
-📤 RETURNING RESULT WITH TIMESTAMPS:
-2025-12-05T01:45:05.475Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.475Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.475Z
-💾 Caching 2 trips...
-2025-12-05T01:45:05.475Z
-💾 CACHING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:05.475Z
-start_timestamp from analysis: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:05.475Z
-end_timestamp from analysis: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:05.475Z
-💾 WRITING TO DrivingSummaries-Neal:
-2025-12-05T01:45:05.475Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:05.475Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:05.475Z
-timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:05.554Z
-✅ CACHED SUCCESSFULLY: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:05.554Z
-💾 CACHING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.554Z
-start_timestamp from analysis: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.554Z
-end_timestamp from analysis: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.554Z
-💾 WRITING TO DrivingSummaries-Neal:
-2025-12-05T01:45:05.554Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.554Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.554Z
-timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.594Z
-✅ CACHED SUCCESSFULLY: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.594Z
-📈 CACHE PERFORMANCE:
-2025-12-05T01:45:05.594Z
-Total Trips: 2
-2025-12-05T01:45:05.594Z
-✅ Cache Hits: 0 (0.0%) - FAST!
-2025-12-05T01:45:05.594Z
-❌ Cache Misses: 0
-2025-12-05T01:45:05.594Z
-🔄 Stale: 2
-2025-12-05T01:45:05.594Z
-💾 Cached This Run: 2
-2025-12-05T01:45:05.594Z
-✅ Successfully processed 2 trips (🚀 0 from cache!)
-2025-12-05T01:45:05.634Z
-🕐 User 32056518-4689-4f9b-b995-0641a89f53f8 timezone: America/Los_Angeles (zipcode: 94568)
-2025-12-05T01:45:05.634Z
-🕐 Adding local time display fields for America/Los_Angeles
-2025-12-05T01:45:05.634Z
-📅 TIMESTAMP DEBUG - BEFORE PROCESSING:
-2025-12-05T01:45:05.634Z
-Trip 1/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:05.634Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:05.634Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:05.634Z
-Trip 2/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.634Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.634Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.635Z
-📅 TIMESTAMP DEBUG - AFTER PROCESSING (FINAL):
-2025-12-05T01:45:05.635Z
-Trip 1/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:05.635Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:05.635Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:05.635Z
-Trip 2/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:05.635Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:05.635Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:05.654Z
-END RequestId: 7ccecb78-3521-4d09-912c-cf0fa6865333
-2025-12-05T01:45:05.655Z
-REPORT RequestId: 7ccecb78-3521-4d09-912c-cf0fa6865333 Duration: 985.62 ms Billed Duration: 986 ms Memory Size: 128 MB Max Memory Used: 85 MB
-2025-12-05T01:45:05.742Z
-START RequestId: a7a85f17-d818-4fa3-8ee6-182c2db85cf1 Version: $LATEST
-2025-12-05T01:45:05.742Z
-🚗 INDUSTRY STANDARD ANALYSIS for identifier: dec4@gmail.com
-2025-12-05T01:45:05.743Z
-🔍 Looking up user by identifier: dec4@gmail.com
-2025-12-05T01:45:05.743Z
-📧 Searching by email: dec4@gmail.com
-2025-12-05T01:45:05.754Z
-✅ Found user by email: dec4@gmail.com (ID: 32056518-4689-4f9b-b995-0641a89f53f8)
-2025-12-05T01:45:05.754Z
-✅ Found user: dec4@gmail.com -> analyzing trips for ID: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.754Z
-🔍 Getting base point for user: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.794Z
-✅ Found user data for 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.794Z
-📍 Using user-specific base point: Dublin, CA
-2025-12-05T01:45:05.794Z
-🔍 Getting trips for user: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.955Z
-✅ Found 2 trips for user 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:05.955Z
-📊 Analyzing 2 trips with INTELLIGENT CACHING
-2025-12-05T01:45:05.995Z
-✅ CACHE HIT: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.035Z
-🔄 TRIP MODIFIED: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.035Z
-🔄 RE-ANALYZING modified trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.035Z
-🎯 ANALYZING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567 for user: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:06.035Z
-📖 Reading trip data from Trips-Neal table for: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.095Z
-📅 TIMESTAMPS FROM TRIPS-NEAL:
-2025-12-05T01:45:06.095Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.095Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.095Z
-Available keys in Trips-Neal: ['user_id', 'created_at', 'end_timestamp', 'start_timestamp', 'status', 'trip_id', 'total_batches', 'finalized_at', 'trip_quality']
-2025-12-05T01:45:06.095Z
-📱 Found FRONTEND VALUES for trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.095Z
-Frontend Distance: 0.000 miles
-2025-12-05T01:45:06.095Z
-Frontend Duration: 0.9 minutes
-2025-12-05T01:45:06.095Z
-Frontend Max Speed: 0.0 mph
-2025-12-05T01:45:06.095Z
-🔍 Getting batches for user: 32056518-4689-4f9b-b995-0641a89f53f8, trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.255Z
-✅ Found 1 batches for user 32056518-4689-4f9b-b995-0641a89f53f8, trip trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.255Z
-📦 Processing 1 batches
-2025-12-05T01:45:06.255Z
-Batch 1: 25 deltas
-2025-12-05T01:45:06.255Z
-📊 Total deltas to process: 25
-2025-12-05T01:45:06.255Z
-🚗 Processing 25 deltas
-2025-12-05T01:45:06.255Z
-📍 Base point: Dublin, CA
-2025-12-05T01:45:06.255Z
-📱 Using EXACT FRONTEND VALUES
-2025-12-05T01:45:06.255Z
-📊 FRONTEND VALUES:
-2025-12-05T01:45:06.255Z
-Distance: 0.000 miles
-2025-12-05T01:45:06.255Z
-Duration: 1m
-2025-12-05T01:45:06.255Z
-Max Speed: 0.0 mph
-2025-12-05T01:45:06.255Z
-Avg Speed: 0.0 mph
-2025-12-05T01:45:06.255Z
-⚠️ Stationary trip detected: 0.0 miles
-2025-12-05T01:45:06.255Z
-📊 Creating minimal analysis for stationary trip
-2025-12-05T01:45:06.255Z
-✅ Trip analysis complete: 0.0/100 (Stationary)
-2025-12-05T01:45:06.255Z
-✅ Added start_timestamp from Trips-Neal: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.255Z
-✅ Added end_timestamp from Trips-Neal: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.255Z
-📤 RETURNING RESULT WITH TIMESTAMPS:
-2025-12-05T01:45:06.255Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.255Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.315Z
-✅ CACHE HIT: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.355Z
-🔄 TRIP MODIFIED: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.355Z
-🔄 RE-ANALYZING modified trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.355Z
-🎯 ANALYZING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337 for user: 32056518-4689-4f9b-b995-0641a89f53f8
-2025-12-05T01:45:06.355Z
-📖 Reading trip data from Trips-Neal table for: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.395Z
-📅 TIMESTAMPS FROM TRIPS-NEAL:
-2025-12-05T01:45:06.395Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.395Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.395Z
-Available keys in Trips-Neal: ['created_at', 'end_timestamp', 'start_timestamp', 'status', 'total_batches', 'trip_id', 'user_id', 'finalized_at', 'trip_quality']
-2025-12-05T01:45:06.395Z
-📱 Found FRONTEND VALUES for trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.395Z
-Frontend Distance: 0.000 miles
-2025-12-05T01:45:06.395Z
-Frontend Duration: 1.8 minutes
-2025-12-05T01:45:06.395Z
-Frontend Max Speed: 0.0 mph
-2025-12-05T01:45:06.395Z
-🔍 Getting batches for user: 32056518-4689-4f9b-b995-0641a89f53f8, trip: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.575Z
-✅ Found 2 batches for user 32056518-4689-4f9b-b995-0641a89f53f8, trip trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.575Z
-📦 Processing 2 batches
-2025-12-05T01:45:06.575Z
-Batch 1: 25 deltas
-2025-12-05T01:45:06.575Z
-Batch 2: 25 deltas
-2025-12-05T01:45:06.575Z
-📊 Total deltas to process: 50
-2025-12-05T01:45:06.575Z
-🚗 Processing 50 deltas
-2025-12-05T01:45:06.575Z
-📍 Base point: Dublin, CA
-2025-12-05T01:45:06.575Z
-📱 Using EXACT FRONTEND VALUES
-2025-12-05T01:45:06.575Z
-📊 FRONTEND VALUES:
-2025-12-05T01:45:06.575Z
-Distance: 0.000 miles
-2025-12-05T01:45:06.575Z
-Duration: 2m
-2025-12-05T01:45:06.575Z
-Max Speed: 0.0 mph
-2025-12-05T01:45:06.575Z
-Avg Speed: 0.0 mph
-2025-12-05T01:45:06.575Z
-⚠️ Stationary trip detected: 0.0 miles
-2025-12-05T01:45:06.575Z
-📊 Creating minimal analysis for stationary trip
-2025-12-05T01:45:06.575Z
-✅ Trip analysis complete: 0.0/100 (Stationary)
-2025-12-05T01:45:06.575Z
-✅ Added start_timestamp from Trips-Neal: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.575Z
-✅ Added end_timestamp from Trips-Neal: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.575Z
-📤 RETURNING RESULT WITH TIMESTAMPS:
-2025-12-05T01:45:06.575Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.575Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.575Z
-💾 Caching 2 trips...
-2025-12-05T01:45:06.575Z
-💾 CACHING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.575Z
-start_timestamp from analysis: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.575Z
-end_timestamp from analysis: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.575Z
-💾 WRITING TO DrivingSummaries-Neal:
-2025-12-05T01:45:06.575Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.575Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.575Z
-timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.634Z
-✅ CACHED SUCCESSFULLY: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.634Z
-💾 CACHING TRIP: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.634Z
-start_timestamp from analysis: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.634Z
-end_timestamp from analysis: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.634Z
-💾 WRITING TO DrivingSummaries-Neal:
-2025-12-05T01:45:06.634Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.634Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.634Z
-timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.674Z
-✅ CACHED SUCCESSFULLY: trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.674Z
-📈 CACHE PERFORMANCE:
-2025-12-05T01:45:06.674Z
-Total Trips: 2
-2025-12-05T01:45:06.674Z
-✅ Cache Hits: 0 (0.0%) - FAST!
-2025-12-05T01:45:06.674Z
-❌ Cache Misses: 0
-2025-12-05T01:45:06.674Z
-🔄 Stale: 2
-2025-12-05T01:45:06.674Z
-💾 Cached This Run: 2
-2025-12-05T01:45:06.674Z
-✅ Successfully processed 2 trips (🚀 0 from cache!)
-2025-12-05T01:45:06.715Z
-🕐 User 32056518-4689-4f9b-b995-0641a89f53f8 timezone: America/Los_Angeles (zipcode: 94568)
-2025-12-05T01:45:06.715Z
-🕐 Adding local time display fields for America/Los_Angeles
-2025-12-05T01:45:06.715Z
-📅 TIMESTAMP DEBUG - BEFORE PROCESSING:
-2025-12-05T01:45:06.715Z
-Trip 1/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.715Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.715Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.715Z
-Trip 2/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.715Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.715Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.715Z
-📅 TIMESTAMP DEBUG - AFTER PROCESSING (FINAL):
-2025-12-05T01:45:06.715Z
-Trip 1/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898737567
-2025-12-05T01:45:06.715Z
-start_timestamp: 2025-12-04T17:38:57.567167+00:00
-2025-12-05T01:45:06.715Z
-end_timestamp: 2025-12-04T17:39:50.948466+00:00
-2025-12-05T01:45:06.715Z
-Trip 2/2 - trip_32056518-4689-4f9b-b995-0641a89f53f8_1764898616337
-2025-12-05T01:45:06.715Z
-start_timestamp: 2025-12-04T17:36:56.337282+00:00
-2025-12-05T01:45:06.715Z
-end_timestamp: 2025-12-04T17:38:46.821873+00:00
-2025-12-05T01:45:06.735Z
-END RequestId: a7a85f17-d818-4fa3-8ee6-182c2db85cf1
+2025-12-14T21:09:20.757-08:00
+INIT_START Runtime Version: python:3.9.v127 Runtime Version ARN: arn:aws:lambda:us-west-1::runtime:df84153e74df669a5c21d51b7260bd9ff56a4a77e7bb2fe7c15c1cbdf7bb9d80
+2025-12-14T21:09:21.261-08:00
+START RequestId: 8e226b81-d237-45fe-859b-645ebee73b1d Version: $LATEST
+2025-12-14T21:09:21.261-08:00
+🚗 INDUSTRY STANDARD ANALYSIS for identifier: isp@gmail.com
+2025-12-14T21:09:21.262-08:00
+🔍 Looking up user by identifier: isp@gmail.com
+2025-12-14T21:09:21.262-08:00
+📧 Searching by email: isp@gmail.com
+2025-12-14T21:09:21.331-08:00
+✅ Found user by email: isp@gmail.com (ID: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b)
+2025-12-14T21:09:21.331-08:00
+✅ Found user: isp@gmail.com -> analyzing trips for ID: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:21.331-08:00
+🔍 Getting base point for user: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:21.354-08:00
+✅ Found user data for 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:21.354-08:00
+⚠️ No custom base point found for 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b, using fallback
+2025-12-14T21:09:21.354-08:00
+🔍 Getting trips for user: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:21.366-08:00
+❌ Error getting trips for user 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b: An error occurred (ValidationException) when calling the Query operation: The table does not have the specified index: user_id-timestamp-index
+2025-12-14T21:09:21.368-08:00
+END RequestId: 8e226b81-d237-45fe-859b-645ebee73b1d
+2025-12-14T21:09:21.368-08:00
+REPORT RequestId: 8e226b81-d237-45fe-859b-645ebee73b1d Duration: 106.58 ms Billed Duration: 607 ms Memory Size: 512 MB Max Memory Used: 83 MB Init Duration: 500.39 ms
+2025-12-14T21:09:34.753-08:00
+START RequestId: 4a258780-4764-4a56-ae5e-c9a638f9d52f Version: $LATEST
+2025-12-14T21:09:34.754-08:00
+🚗 INDUSTRY STANDARD ANALYSIS for identifier: pkatrey@gmail.com
+2025-12-14T21:09:34.754-08:00
+🔍 Looking up user by identifier: pkatrey@gmail.com
+2025-12-14T21:09:34.754-08:00
+📧 Searching by email: pkatrey@gmail.com
+2025-12-14T21:09:34.763-08:00
+✅ Found user by email: pkatrey@gmail.com (ID: 2bf09af3-af4e-4a22-bf62-26165e4a1341)
+2025-12-14T21:09:34.763-08:00
+✅ Found user: pkatrey@gmail.com -> analyzing trips for ID: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:09:34.763-08:00
+🔍 Getting base point for user: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:09:34.768-08:00
+✅ Found user data for 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:09:34.768-08:00
+📍 Using user-specific base point: Mechanicville, NY
+2025-12-14T21:09:34.768-08:00
+🔍 Getting trips for user: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:09:34.775-08:00
+❌ Error getting trips for user 2bf09af3-af4e-4a22-bf62-26165e4a1341: An error occurred (ValidationException) when calling the Query operation: The table does not have the specified index: user_id-timestamp-index
+2025-12-14T21:09:34.777-08:00
+END RequestId: 4a258780-4764-4a56-ae5e-c9a638f9d52f
+2025-12-14T21:09:34.777-08:00
+REPORT RequestId: 4a258780-4764-4a56-ae5e-c9a638f9d52f Duration: 23.20 ms Billed Duration: 24 ms Memory Size: 512 MB Max Memory Used: 83 MB
+2025-12-14T21:09:59.311-08:00
+START RequestId: dbdf9620-cf0b-431c-a765-bb4c7ce477ec Version: $LATEST
+2025-12-14T21:09:59.311-08:00
+🚗 INDUSTRY STANDARD ANALYSIS for identifier: isp@gmail.com
+2025-12-14T21:09:59.311-08:00
+🔍 Looking up user by identifier: isp@gmail.com
+2025-12-14T21:09:59.311-08:00
+📧 Searching by email: isp@gmail.com
+2025-12-14T21:09:59.318-08:00
+✅ Found user by email: isp@gmail.com (ID: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b)
+2025-12-14T21:09:59.318-08:00
+✅ Found user: isp@gmail.com -> analyzing trips for ID: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:59.318-08:00
+🔍 Getting base point for user: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:59.321-08:00
+✅ Found user data for 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:59.321-08:00
+⚠️ No custom base point found for 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b, using fallback
+2025-12-14T21:09:59.321-08:00
+🔍 Getting trips for user: 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b
+2025-12-14T21:09:59.329-08:00
+❌ Error getting trips for user 8f9bbb25-4623-4e5b-bdca-3b68a6a9fd1b: An error occurred (ValidationException) when calling the Query operation: The table does not have the specified index: user_id-timestamp-index
+2025-12-14T21:09:59.330-08:00
+END RequestId: dbdf9620-cf0b-431c-a765-bb4c7ce477ec
+2025-12-14T21:09:59.330-08:00
+REPORT RequestId: dbdf9620-cf0b-431c-a765-bb4c7ce477ec Duration: 19.04 ms Billed Duration: 20 ms Memory Size: 512 MB Max Memory Used: 83 MB
+2025-12-14T21:10:53.948-08:00
+START RequestId: ffc0083f-8451-4c18-b40e-8eba93519e7b Version: $LATEST
+2025-12-14T21:10:53.950-08:00
+🚗 INDUSTRY STANDARD ANALYSIS for identifier: pkatrey@gmail.com
+2025-12-14T21:10:53.950-08:00
+🔍 Looking up user by identifier: pkatrey@gmail.com
+2025-12-14T21:10:53.950-08:00
+📧 Searching by email: pkatrey@gmail.com
+2025-12-14T21:10:53.958-08:00
+✅ Found user by email: pkatrey@gmail.com (ID: 2bf09af3-af4e-4a22-bf62-26165e4a1341)
+2025-12-14T21:10:53.958-08:00
+✅ Found user: pkatrey@gmail.com -> analyzing trips for ID: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:10:53.958-08:00
+🔍 Getting base point for user: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:10:53.962-08:00
+✅ Found user data for 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:10:53.962-08:00
+📍 Using user-specific base point: Mechanicville, NY
+2025-12-14T21:10:53.962-08:00
+🔍 Getting trips for user: 2bf09af3-af4e-4a22-bf62-26165e4a1341
+2025-12-14T21:10:53.969-08:00
+❌ Error getting trips for user 2bf09af3-af4e-4a22-bf62-26165e4a1341: An error occurred (ValidationException) when calling the Query operation: The table does not have the specified index: user_id-timestamp-index
+2025-12-14T21:10:53.971-08:00
+END RequestId: ffc0083f-8451-4c18-b40e-8eba93519e7b
+2025-12-14T21:10:53.971-08:00
+REPORT RequestId: ffc0083f-8451-4c18-b40e-8eba93519e7b Duration: 22.46 ms Billed Duration: 23 ms Memory Size: 512 MB Max Memory Used: 84 MB

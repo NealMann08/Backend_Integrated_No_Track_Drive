@@ -127,24 +127,37 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
 
 
   void _sortTrips() {
-    // Always sort by most recent first using proper timestamp parsing
-    trips.sort((a, b) {
-      try {
-        // Handle both 'start_timestamp' and 'timestamp' fields
-        String timeA = a['start_timestamp'] ?? a['timestamp'] ?? '';
-        String timeB = b['start_timestamp'] ?? b['timestamp'] ?? '';
-        
-        if (timeA.isEmpty || timeB.isEmpty) return 0;
-        
-        DateTime dateA = DateTime.parse(timeA);
-        DateTime dateB = DateTime.parse(timeB);
-        
-        return dateB.compareTo(dateA); // Most recent first
-      } catch (e) {
-        print('Error sorting trips: $e');
-        return 0;
-      }
-    });
+    if (_filter == 'longest') {
+      // Sort by distance (longest first)
+      trips.sort((a, b) {
+        try {
+          double distA = (a['total_distance_miles'] ?? 0.0).toDouble();
+          double distB = (b['total_distance_miles'] ?? 0.0).toDouble();
+          return distB.compareTo(distA); // Longest first
+        } catch (e) {
+          print('Error sorting trips by distance: $e');
+          return 0;
+        }
+      });
+    } else {
+      // Default: sort by most recent first (for 'recent' or null)
+      trips.sort((a, b) {
+        try {
+          String timeA = a['start_timestamp'] ?? a['timestamp'] ?? '';
+          String timeB = b['start_timestamp'] ?? b['timestamp'] ?? '';
+
+          if (timeA.isEmpty || timeB.isEmpty) return 0;
+
+          DateTime dateA = DateTime.parse(timeA);
+          DateTime dateB = DateTime.parse(timeB);
+
+          return dateB.compareTo(dateA); // Most recent first
+        } catch (e) {
+          print('Error sorting trips: $e');
+          return 0;
+        }
+      });
+    }
   }
 
   Widget _buildStatItem(IconData icon, String label, String value) {
@@ -195,19 +208,8 @@ class PreviousTripsPageState extends State<PreviousTripsPage> {
   List<Map<String, dynamic>> getFilteredTrips() {
     final now = DateTime.now();
 
-    // ALWAYS sort by most recent first (descending timestamp)
-    trips.sort((a, b) {
-      try {
-        String timeA = a['start_timestamp'] ?? '';
-        String timeB = b['start_timestamp'] ?? '';
-        if (timeA.isEmpty || timeB.isEmpty) return 0;
-        DateTime dateA = DateTime.parse(timeA);
-        DateTime dateB = DateTime.parse(timeB);
-        return dateB.compareTo(dateA); // Most recent first
-      } catch (e) {
-        return 0;
-      }
-    });
+    // Sort based on filter selection
+    _sortTrips();
 
     return trips
         .whereType<Map<String, dynamic>>()

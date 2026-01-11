@@ -785,21 +785,28 @@ Widget _buildUserScoreCard({
                 if (showFullDetails && forWebLayout) ...[
                   Divider(),
                   SizedBox(height: 16),
-                  
+
                   // Speed Consistency with % bar
                   if (_userScore!['speed_consistency'] != null)
                     _buildScoreDetailRow(
-                      'Speed Consistency', 
+                      'Speed Consistency',
                       _userScore!['speed_consistency'].toDouble()
                     ),
-                  
-                  // Safe Turns % with blue bar
-                  if (_userScore!['safe_turns_percentage'] != null)
+
+                  // Braking with % bar
+                  if (_userScore!['brake_score'] != null)
                     _buildScoreDetailRow(
-                      'Safe Turns', 
-                      _userScore!['safe_turns_percentage'].toDouble()
+                      'Braking',
+                      (_userScore!['brake_score'] * 100).toDouble()
                     ),
-                  
+
+                  // Acceleration with % bar
+                  if (_userScore!['accel_score'] != null)
+                    _buildScoreDetailRow(
+                      'Acceleration',
+                      (_userScore!['accel_score'] * 100).toDouble()
+                    ),
+
                   SizedBox(height: 16),
                   
                   // Numerical metrics grouped together
@@ -871,30 +878,9 @@ Widget _buildUserScoreCard({
                   ),
                 ],
 
-                SizedBox(height: 8),
-                if (_userScore!.containsKey('updated_at'))
-                  Text(
-                    'Last updated: ${TripService.formatTimestamp(_userScore!['updated_at'])}',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: isWeb ? 14 : 12,
-                    ),
-                  ),
-
-                // Calculation details section - added here (KEEP THIS)
+                // Calculation details section
                 if (_userScore != null && _userScore!['calculation'] != null)
                   _buildCalculationDetails(context, _userScore!),
-
-                SizedBox(height: 8),
-                if (_userScore!.containsKey('updated_at'))
-                  Text(
-                    'Last updated: ${TripService.formatTimestamp(_userScore!['updated_at'])}',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: isWeb ? 14 : 12,
-                    ),
-                  ),
-                
 
               ],
             ),

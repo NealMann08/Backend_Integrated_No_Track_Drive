@@ -1,18 +1,23 @@
-import 'dart:io';
+/*
+ * User Home Page
+ *
+ * This is the main dashboard that regular drivers see after logging in.
+ * Shows a big button to start recording a trip, recent trip history,
+ * and a link to view their safety score.
+ *
+ * The recent trips load from cached analytics data to keep things snappy.
+ */
 
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'dart:convert';
+
 import 'current_trip_page.dart';
 import 'trip_helper.dart';
-
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:intl/intl.dart';
-
-import 'data_manager.dart'; // Add this import
-
-import 'dart:math';
+import 'score_page.dart';
+import 'data_manager.dart';
 
 class UserHomePage extends StatefulWidget {
   final String firstName;
@@ -27,7 +32,7 @@ class UserHomePage extends StatefulWidget {
   });
 
   @override
-  _UserHomePageState createState() => _UserHomePageState();
+  State<UserHomePage> createState() => _UserHomePageState();
 }
 
 class _UserHomePageState extends State<UserHomePage> {
@@ -42,119 +47,10 @@ class _UserHomePageState extends State<UserHomePage> {
     _checkForActiveTrip();
   }
 
-  // Future<void> _loadRecentTrips() async {
-  //   setState(() {
-  //     isLoading = true;
-  //     errorMessage = '';
-  //   });
-
-  //   try {
-  //     List<dynamic> trips = await TripService.fetchPreviousTrips();
-  //     setState(() {
-  //       recentTrips = trips.take(3).toList();
-  //       isLoading = false;
-  //     });
-  //   } catch (e) {
-  //     setState(() {
-  //       isLoading = false;
-  //       errorMessage = 'Failed to load recent trips';
-  //     });
-  //   }
-  // }
-  // revert to above function if below fails
-  // Future<void> _loadRecentTrips() async {
-  //   if (!mounted) return;
-    
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-    
-  //   // Check for cached data first
-  //   String? cachedTrips = prefs.getString('cached_trips');
-  //   String? cacheTime = prefs.getString('cache_time');
-    
-  //   // Use cache if less than 5 minutes old
-  //   if (cachedTrips != null && cacheTime != null) {
-  //     try {
-  //       DateTime cached = DateTime.parse(cacheTime);
-  //       if (DateTime.now().difference(cached).inMinutes < 5) {
-  //         List<dynamic> trips = json.decode(cachedTrips);
-  //         if (mounted) {
-  //           setState(() {
-  //             recentTrips = trips.take(3).toList();
-  //             isLoading = false;
-  //           });
-  //         }
-  //         return; // Exit early with cached data
-  //       }
-  //     } catch (e) {
-  //       // If cache is corrupted, continue to fetch fresh data
-  //       print('Cache error: $e');
-  //     }
-  //   }
-    
-  //   // If no valid cache, show loading and fetch fresh data
-  //   setState(() {
-  //     isLoading = true;
-  //     errorMessage = '';
-  //   });
-
-  //   String? userDataJson = prefs.getString('user_data');
-    
-  //   if (userDataJson == null) {
-  //     if (mounted) {
-  //       setState(() {
-  //         recentTrips = [];
-  //         isLoading = false;
-  //       });
-  //     }
-  //     return;
-  //   }
-    
-  //   Map<String, dynamic> userData = json.decode(userDataJson);
-  //   String userEmail = userData['email'] ?? '';
-    
-  //   try {
-  //     // Use YOUR analyze-driver endpoint
-  //     final response = await http.get(
-  //       Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=$userEmail'),
-  //     );
-      
-  //     if (response.statusCode == 200) {
-  //       final data = json.decode(response.body);
-  //       List<dynamic> trips = data['trips'] ?? [];
-        
-  //       // Cache the trips for faster loading next time
-  //       await prefs.setString('cached_trips', json.encode(trips));
-  //       await prefs.setString('cache_time', DateTime.now().toIso8601String());
-        
-  //       if (mounted) {
-  //         setState(() {
-  //           // Take only the 3 most recent trips
-  //           recentTrips = trips.take(3).toList();
-  //           isLoading = false;
-  //         });
-  //       }
-  //     } else {
-  //       if (mounted) {
-  //         setState(() {
-  //           recentTrips = [];
-  //           isLoading = false;
-  //         });
-  //       }
-  //     }
-  //   } catch (e) {
-  //     if (mounted) {
-  //       setState(() {
-  //         recentTrips = [];
-  //         isLoading = false;
-  //         errorMessage = '';  // Don't show error, just show empty state
-  //       });
-  //     }
-  //   }
-  // }
-  // revert to above function if below fails
+  /// Loads the user's most recent trips from the data manager
   Future<void> _loadRecentTrips() async {
     if (!mounted) return;
-    
+
     setState(() {
       isLoading = true;
       errorMessage = '';
@@ -162,10 +58,10 @@ class _UserHomePageState extends State<UserHomePage> {
 
     try {
       Map<String, dynamic>? analytics = await DataManager.getDriverAnalytics();
-      
+
       if (analytics != null) {
         List<dynamic> trips = analytics['trips'] ?? [];
-        
+
         if (mounted) {
           setState(() {
             recentTrips = trips.take(3).toList();
@@ -191,24 +87,25 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
+  /// Checks if there's an old trip that was never finished
+  /// Shows a dialog asking if user wants to abandon or continue it
   Future<void> _checkForActiveTrip() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? activeTripId = prefs.getString('current_trip_id');
     String? tripStartTime = prefs.getString('trip_start_time');
-    
+
     if (activeTripId != null && activeTripId.isNotEmpty && tripStartTime != null) {
-      // There's an active trip - check if it's been more than 4 hours (likely abandoned)
       DateTime startTime = DateTime.parse(tripStartTime);
       Duration timeSinceStart = DateTime.now().difference(startTime);
-      
+
+      // If trip is more than 4 hours old, it was probably forgotten
       if (timeSinceStart.inHours > 4) {
-        // Trip likely abandoned - show dialog
         if (mounted) {
           showDialog(
             context: context,
             builder: (BuildContext context) {
               return AlertDialog(
-                title: Text('Active Trip Found'),
+                title: const Text('Active Trip Found'),
                 content: Text(
                   'You have an active trip from ${timeSinceStart.inHours} hours ago. '
                   'Would you like to abandon it or continue?'
@@ -216,30 +113,29 @@ class _UserHomePageState extends State<UserHomePage> {
                 actions: [
                   TextButton(
                     onPressed: () async {
-                      // Abandon trip - clear data
+                      // Clear the old trip data
                       await prefs.remove('current_trip_id');
                       await prefs.remove('trip_start_time');
                       await prefs.setInt('batch_counter', 0);
                       await prefs.setDouble('max_speed', 0.0);
                       await prefs.setInt('point_counter', 0);
                       Navigator.of(context).pop();
-                      
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Previous trip abandoned')),
+                        const SnackBar(content: Text('Previous trip abandoned')),
                       );
                     },
-                    child: Text('Abandon Trip'),
+                    child: const Text('Abandon Trip'),
                   ),
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).pop();
-                      // Navigate to current trip page to resume
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => CurrentTripPage()),
                       );
                     },
-                    child: Text('Continue Trip'),
+                    child: const Text('Continue Trip'),
                   ),
                 ],
               );
@@ -250,19 +146,17 @@ class _UserHomePageState extends State<UserHomePage> {
     }
   }
 
-
+  /// Builds the recent trips section card
   Widget _buildPreviousTripsSection() {
     return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: Colors.lightBlueAccent,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Recent Trips',
               style: TextStyle(
                 fontSize: 24,
@@ -270,124 +164,120 @@ class _UserHomePageState extends State<UserHomePage> {
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 10),
-            isLoading
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text(
-                          'Loading trips...',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : errorMessage.isNotEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline, size: 48, color: Colors.white70),
-                          SizedBox(height: 12),
-                          Text(
-                            errorMessage,
-                            style: TextStyle(color: Colors.white, fontSize: 16),
-                            textAlign: TextAlign.center,
-                          ),
-                          SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadRecentTrips,
-                            child: Text('Retry'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.blue,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : recentTrips.isEmpty
-                        ? Center(
-                            child: Text(
-                              'No recent trips available.',
-                              style: TextStyle(fontSize: 18, color: Colors.white),
-                            ),
-                          )
-                        : Column(
-                            children: recentTrips.take(3).map((trip) {
-                              // Parse the date properly from your backend
-                              String dateDisplay = "No date";
-                              String startTimeStr = trip['start_timestamp'] ?? '';
-                              if (startTimeStr.isNotEmpty) {
-                                try {
-                                  DateTime startTime = DateTime.parse(startTimeStr).toLocal(); // Convert to local time
-                                  dateDisplay = DateFormat('MMM d, yyyy • h:mm a').format(startTime);
-                                } catch (e) {
-                                  dateDisplay = "Invalid date";
-                                }
-                              }
-                              
-                              // Get distance from your backend field names
-                              double distance = (trip['total_distance_miles'] ?? 0.0).toDouble();
-                              
-                              return Container(
-                                margin: EdgeInsets.only(bottom: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(26),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: ListTile(
-                                  leading: Container(
-                                    padding: EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue[700],
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.directions_car,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  title: Text(
-                                    dateDisplay,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    '${distance.toStringAsFixed(2)} miles',
-                                    style: TextStyle(
-                                      color: Colors.white.withAlpha(204),
-                                    ),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.white,
-                                    ),
-                                    onPressed: () {
-                                      TripService.showTripDetails(context, trip);
-                                    },
-                                  ),
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+            const SizedBox(height: 10),
+            _buildTripsContent(),
           ],
         ),
       ),
+    );
+  }
+
+  /// Returns the appropriate content for the trips section
+  Widget _buildTripsContent() {
+    if (isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Loading trips...',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (errorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.white70),
+            const SizedBox(height: 12),
+            Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadRecentTrips,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.blue,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (recentTrips.isEmpty) {
+      return const Center(
+        child: Text(
+          'No recent trips available.',
+          style: TextStyle(fontSize: 18, color: Colors.white),
+        ),
+      );
+    }
+
+    // Show the trip list
+    return Column(
+      children: recentTrips.take(3).map((trip) {
+        // Parse the timestamp for display
+        String dateDisplay = "No date";
+        String startTimeStr = trip['start_timestamp'] ?? '';
+        if (startTimeStr.isNotEmpty) {
+          try {
+            DateTime startTime = DateTime.parse(startTimeStr).toLocal();
+            dateDisplay = DateFormat('MMM d, yyyy • h:mm a').format(startTime);
+          } catch (e) {
+            dateDisplay = "Invalid date";
+          }
+        }
+
+        double distance = (trip['total_distance_miles'] ?? 0.0).toDouble();
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(26),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue[700],
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.directions_car, color: Colors.white, size: 20),
+            ),
+            title: Text(
+              dateDisplay,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              '${distance.toStringAsFixed(2)} miles',
+              style: TextStyle(color: Colors.white.withAlpha(204)),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.chevron_right, color: Colors.white),
+              onPressed: () {
+                TripService.showTripDetails(context, trip);
+              },
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -404,9 +294,9 @@ class _UserHomePageState extends State<UserHomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with welcome and profile
+            // Welcome header with profile avatar
             Container(
-              padding: EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -415,10 +305,7 @@ class _UserHomePageState extends State<UserHomePage> {
                     children: [
                       Text(
                         'Welcome back,',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
-                        ),
+                        style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
                       ),
                       Text(
                         displayName,
@@ -433,13 +320,13 @@ class _UserHomePageState extends State<UserHomePage> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: Colors.blue.shade300,
-                    backgroundImage: widget.profileImage != null 
-                        ? FileImage(widget.profileImage!) 
+                    backgroundImage: widget.profileImage != null
+                        ? FileImage(widget.profileImage!)
                         : null,
                     child: widget.profileImage == null
                         ? Text(
                             initials,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -450,46 +337,40 @@ class _UserHomePageState extends State<UserHomePage> {
                 ],
               ),
             ),
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-            // Start Trip Button
+            // Big Start Trip button
             Center(
               child: GestureDetector(
                 onTap: () async {
-                  // Initialize trip state before navigating
                   SharedPreferences prefs = await SharedPreferences.getInstance();
                   String? userDataJson = prefs.getString('user_data');
-                  
+
                   if (userDataJson != null) {
                     Map<String, dynamic> userData = json.decode(userDataJson);
-                    
-                    // ✅ VERIFY BASE POINT EXISTS
+
+                    // Make sure base point is set (needed for geofencing)
                     if (userData['base_point'] == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: Base point not set. Please update your profile with a zipcode.'),
-                          backgroundColor: Colors.red,
-                          duration: Duration(seconds: 4),
-                        ),
-                      );
-                      return; // Don't start trip without base point
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Error: Base point not set. Please update your profile with a zipcode.'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                      return;
                     }
-                    
-                    String userId = userData['user_id'] ?? '';
 
-                    print('✅ Navigating to trip page (trip will start when user clicks "Start Trip")');
-                    print('Base point: ${userData['base_point']['city']}, ${userData['base_point']['state']}');
-
-                    // Navigate to current trip page
-                    // NOTE: Trip ID and tracking data will be created when user clicks
-                    // the green "Start Trip" button on the trip page
+                    // Navigate to trip recording page
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => CurrentTripPage()),
                     );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      const SnackBar(
                         content: Text('Error: User data not found. Please log in again.'),
                         backgroundColor: Colors.red,
                       ),
@@ -514,15 +395,11 @@ class _UserHomePageState extends State<UserHomePage> {
                       ),
                     ],
                   ),
-                  child: Center(
+                  child: const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.directions_car,
-                          size: 48,
-                          color: Colors.white,
-                        ),
+                        Icon(Icons.directions_car, size: 48, color: Colors.white),
                         SizedBox(height: 8),
                         Text(
                           "Start Trip",
@@ -538,9 +415,9 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
               ),
             ),
-            SizedBox(height: 40),
+            const SizedBox(height: 40),
 
-            // Recent Trips Section
+            // Recent Trips section
             Text(
               'Recent Trips',
               style: TextStyle(
@@ -549,11 +426,11 @@ class _UserHomePageState extends State<UserHomePage> {
                 color: Colors.blue.shade800,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildPreviousTripsSection(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-            // Score Section
+            // Safety Score section
             Text(
               'Your Safety Score',
               style: TextStyle(
@@ -562,13 +439,16 @@ class _UserHomePageState extends State<UserHomePage> {
                 color: Colors.blue.shade800,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             GestureDetector(
               onTap: () {
-                // Navigate to score page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ScorePage()),
+                );
               },
               child: Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
@@ -587,8 +467,8 @@ class _UserHomePageState extends State<UserHomePage> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.star, size: 40, color: Colors.amber),
-                    SizedBox(width: 16),
+                    const Icon(Icons.star, size: 40, color: Colors.amber),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -601,13 +481,10 @@ class _UserHomePageState extends State<UserHomePage> {
                               color: Colors.blue.shade800,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'Check your latest driving safety assessment',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                            ),
+                            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                           ),
                         ],
                       ),

@@ -1,3 +1,12 @@
+/*
+ * Home Page Router
+ *
+ * This is the main hub after login. It figures out what role the user has
+ * (regular driver, insurance provider, or admin) and shows them the right
+ * dashboard. Also handles loading the user's profile and clearing any
+ * leftover trip data from previous sessions.
+ */
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
@@ -9,9 +18,7 @@ import 'custom_app_bar.dart';
 import 'user_home_page.dart';
 import 'insurance_home_page.dart';
 import 'admin_home_page.dart';
-
-import 'data_manager.dart'; // Add this import
-
+import 'data_manager.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -26,6 +33,8 @@ class HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
   File? _profileImage;
   bool isLoading = true;
+
+  // User info pulled from the auth token
   late String role;
   late String email;
   late String firstName;
@@ -36,27 +45,26 @@ class HomePageState extends State<HomePage> {
     super.initState();
     _checkAuthToken();
     _loadProfileImage();
-    _preloadUserData(); // Add this
-    _clearStaleTripData(); // CRITICAL: Clear stale trip data on app entry
+    _preloadUserData();
+    _clearStaleTripData();
   }
 
+  // Start loading user data in background so screens load faster
   void _preloadUserData() async {
-    // Preload all user data in the background
     DataManager.preloadData();
   }
 
-  /// CRITICAL FIX: Automatically clear stale trip data when entering the app
-  /// This prevents the navigation blocking bug where old trip data blocks navigation
+  /// Clears any trip data left over from a previous app session
+  /// This fixes a bug where old trip data would block navigation
   Future<void> _clearStaleTripData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? tripId = prefs.getString('current_trip_id');
     String? startTimeStr = prefs.getString('trip_start_time');
 
-    // If there's any trip data, clear it (it's from a previous session)
     if (tripId != null && startTimeStr != null) {
-      print('🧹 Auto-clearing stale trip data from previous session');
+      debugPrint('Clearing stale trip data from previous session');
 
-      // Clear all trip-related data
+      // Wipe all the old trip tracking data
       await prefs.remove('current_trip_id');
       await prefs.remove('trip_start_time');
       await prefs.setInt('batch_counter', 0);
@@ -65,33 +73,11 @@ class HomePageState extends State<HomePage> {
       await prefs.setDouble('current_speed', 0.0);
       await prefs.setDouble('total_distance', 0.0);
 
-      print('✅ Stale trip data cleared - navigation unrestricted');
+      debugPrint('Stale trip data cleared');
     }
   }
 
-
-  // Future<void> _checkAuthToken() async {
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   String? token = prefs.getString('access_token');
-
-  //   Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-
-  //   setState(() {
-  //     role = decodedToken['role'];
-  //     firstName = decodedToken['first_name'];
-  //     lastName = decodedToken['last_name'];
-  //     email = decodedToken['email'];
-  //     isLoading = false;
-  //   });
-
-  //   await prefs.setString('role', role);
-  //   await prefs.setString('first_name', firstName);
-  //   await prefs.setString('last_name', lastName);
-  //   await prefs.setString('email', email);
-  //   }
-
-  //uncomment above code if below function causes issues
-
+  /// Decodes the JWT token to get user info like name and role
   Future<void> _checkAuthToken() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('access_token');
@@ -99,38 +85,42 @@ class HomePageState extends State<HomePage> {
 
     if (token != null && userDataJson != null) {
       try {
-        // Try to decode as JWT first (for backward compatibility)
+        // Try JWT decode first, fall back to base64 if that fails
         Map<String, dynamic> decodedToken;
         try {
           decodedToken = JwtDecoder.decode(token);
         } catch (e) {
-          // If JWT decode fails, decode our base64 JSON format
+          // Our custom token format uses base64
           final decodedBytes = base64.decode(token);
           final decodedString = utf8.decode(decodedBytes);
           decodedToken = json.decode(decodedString);
         }
 
-        // Also parse the user_data we stored
+        // Parse the stored user data
         Map<String, dynamic> userData = json.decode(userDataJson);
 
         setState(() {
           role = decodedToken['role'] ?? widget.role;
-          // Parse name from userData (your backend stores full name, not split)
+
+          // Split the full name into first and last
           String fullName = userData['name'] ?? '';
           List<String> nameParts = fullName.split(' ');
           firstName = nameParts.isNotEmpty ? nameParts[0] : '';
           lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
           email = userData['email'] ?? decodedToken['email'] ?? '';
           isLoading = false;
         });
 
+        // Save to prefs so other screens can access it
         await prefs.setString('role', role);
         await prefs.setString('first_name', firstName);
         await prefs.setString('last_name', lastName);
         await prefs.setString('email', email);
+
       } catch (e) {
         debugPrint('Error decoding token: $e');
-        // Fall back to using the role passed from login
+        // Something went wrong, use defaults
         setState(() {
           role = widget.role;
           firstName = 'User';
@@ -140,11 +130,12 @@ class HomePageState extends State<HomePage> {
         });
       }
     } else {
-      debugPrint('No token found in SharedPreferences');
+      debugPrint('No token found');
       setState(() => isLoading = false);
     }
   }
 
+  // Load saved profile picture from device storage
   Future<void> _loadProfileImage() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final imagePath = prefs.getString('profile_image');
@@ -155,12 +146,14 @@ class HomePageState extends State<HomePage> {
     }
   }
 
+  // Handle bottom nav bar taps
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
 
+  /// Returns the appropriate home page based on user role
   Widget _buildRoleSpecificHomePage(bool isWeb) {
     switch (widget.role) {
       case 'user':
@@ -185,6 +178,7 @@ class HomePageState extends State<HomePage> {
     final isAdminOrInsurance = widget.role == 'admin' || widget.role == 'insurance';
 
     return Scaffold(
+      // Show the app bar for non-loading states
       appBar: isLoading
           ? null
           : CustomAppBar(
@@ -192,6 +186,8 @@ class HomePageState extends State<HomePage> {
               onItemTapped: _onItemTapped,
               role: widget.role,
             ),
+
+      // Main content area
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : Center(
@@ -200,6 +196,8 @@ class HomePageState extends State<HomePage> {
                 child: _buildRoleSpecificHomePage(isWeb),
               ),
             ),
+
+      // Only show bottom nav for regular users (not admin/insurance)
       bottomNavigationBar: isLoading || isAdminOrInsurance
           ? null
           : CustomAppBar(

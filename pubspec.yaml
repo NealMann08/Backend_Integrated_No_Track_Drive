@@ -49,6 +49,12 @@ dependencies:
   # This allows the score page to be displayed as a percent for score
   percent_indicator: ^4.2.2
 
+  # PDF generation and sharing
+  pdf: ^3.10.8
+  path_provider: ^2.1.1
+  share_plus: ^7.2.1
+  url_launcher: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

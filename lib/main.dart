@@ -1,80 +1,60 @@
-// import 'package:drive_guard/admin_home_page.dart';
-// import 'package:drive_guard/insurance_home_page.dart';
-// import 'package:flutter/material.dart';
-// import 'login_page.dart'; // Ensure you import the correct file
-// import 'package:flutter_settings_screens/flutter_settings_screens.dart';
+/*
+ * DriveGuard - Safe Driving Analytics App
+ * Main entry point for the application
+ *
+ * This app tracks driving behavior and provides safety scores to help
+ * drivers improve their habits and potentially lower insurance rates.
+ *
+ * Built with Flutter for cross-platform support (iOS, Android, Web)
+ */
 
-
-// void main()  async{
-//   await Settings.init(cacheProvider: SharePreferenceCache());
-//     FlutterError.onError = (FlutterErrorDetails details) {
-//     FlutterError.presentError(details);
-//     // Send to logging service or print
-//     print('Flutter error caught: ${details.exception}');
-//   };
-//   runApp(MyApp());  
-// }
-
-
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Admin Dashboard',
-//       theme: ThemeData(
-//         primarySwatch: Colors.blue,
-//         visualDensity: VisualDensity.adaptivePlatformDensity,
-//       ),
-//       home: LoginPageWidget(), // Correct the reference here
-//       // home: AdminHomePage(),
-//       // home: InsuranceHomePage(),
-
-
-//     );
-//   }
-// }
-
-import 'package:drive_guard/admin_home_page.dart';
-import 'package:drive_guard/insurance_home_page.dart';
 import 'package:flutter/material.dart';
-import 'login_page.dart';
 import 'package:flutter_settings_screens/flutter_settings_screens.dart';
+import 'login_page.dart';
+import 'admin_home_page.dart';
+import 'insurance_home_page.dart';
 
 void main() async {
-  // Ensure Flutter binding is initialized
+  // Make sure Flutter is ready before we do anything else
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize settings
+  // Set up the settings cache - this stores user preferences locally
   await Settings.init(cacheProvider: SharePreferenceCache());
 
-  // Error handling
+  // Set up error handling so crashes don't go unnoticed during development
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-    print('Flutter error caught: ${details.exception}');
+    debugPrint('Error caught: ${details.exception}');
   };
 
-  runApp(MyApp());
+  runApp(const DriveGuardApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// Root widget of the application
+/// Sets up theming and navigation routes for the entire app
+class DriveGuardApp extends StatelessWidget {
+  const DriveGuardApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Drive Guard',
+      title: 'DriveGuard',
+      debugShowCheckedModeBanner: false,
+
+      // App-wide theme configuration
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: LoginPageWidget(),
-      // Define routes for navigation
+
+      // Start at the login page
+      home: const LoginPageWidget(),
+
+      // Named routes for easy navigation throughout the app
       routes: {
-        '/login': (context) => LoginPageWidget(),
-        '/admin': (context) => AdminHomePage(),
-        '/insurance': (context) => InsuranceHomePage(),
+        '/login': (context) => const LoginPageWidget(),
+        '/admin': (context) => const AdminHomePage(),
+        '/insurance': (context) => const InsuranceHomePage(),
       },
     );
   }
