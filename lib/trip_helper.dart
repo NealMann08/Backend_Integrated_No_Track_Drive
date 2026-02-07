@@ -10,11 +10,21 @@ class TripService {
 
 static Future<List<Map<String, dynamic>>> searchInsurance(String query) async {
     try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.server}/admin/search_insurance?query=$query'),
+      final response = await http.post(
+        Uri.parse('${AppConfig.server}/auth-user'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'mode': 'search_users',
+          'query': query,
+          'role_filter': 'provider',
+        }),
       );
       if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(json.decode(response.body));
+        final data = json.decode(response.body);
+        if (data['users'] is List) {
+          return List<Map<String, dynamic>>.from(data['users']);
+        }
+        return [];
       }
       throw Exception('Failed to search insurance companies');
     } catch (e) {
@@ -24,10 +34,16 @@ static Future<List<Map<String, dynamic>>> searchInsurance(String query) async {
 
   static Future<bool> checkServerStatus() async {
     try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.server}/ping'),
+      final response = await http.post(
+        Uri.parse('${AppConfig.server}/auth-user'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'mode': 'health_check'}),
       ).timeout(const Duration(seconds: 5));
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['status'] == 'healthy';
+      }
+      return false;
     } catch (e) {
       return false;
     }
@@ -658,30 +674,22 @@ static Future<List<Map<String, dynamic>>> fetchPreviousTripsData() async {
   }
 
 static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
-  final uri = Uri.parse('$server/userLookup').replace(
-    queryParameters: {'query': query}
-  );
-  
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  String? token = prefs.getString('access_token');
-
   try {
-    final response = await http.get(
-      uri, 
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
+    final response = await http.post(
+      Uri.parse('$server/auth-user'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'mode': 'search_users',
+        'query': query,
+      }),
     );
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> data = json.decode(response.body);
-      
-      // Extract the users array from the response
       if (data['users'] is List) {
         return List<Map<String, dynamic>>.from(data['users']);
       }
-      throw Exception('Invalid users data format');
+      return [];
     } else {
       throw Exception('Failed to search users: ${response.statusCode}');
     }

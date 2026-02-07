@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'custom_app_bar.dart';
 import 'home_page.dart';
 import 'login_page.dart';
-import 'notifications_page.dart';
 import 'data_manager.dart'; // Import DataManager for cache clearing
 
 class SettingsPage extends StatefulWidget {
@@ -108,7 +107,6 @@ Widget build(BuildContext context) {
                           title: 'SETTINGS',
                           children: <Widget>[
                             const SizedBox(height: 8),
-                            NotificationsPage(),
                             PrivSecPage(),
                             HelpSupportPage(),
                             AboutPage(),

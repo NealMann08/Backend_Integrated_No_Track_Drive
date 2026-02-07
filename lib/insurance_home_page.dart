@@ -4,7 +4,11 @@ import 'trip_helper.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';  // ADD THIS LINE
+import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'pdf_helper.dart';
 
 
 class InsuranceHomePage extends StatefulWidget {
@@ -90,7 +94,9 @@ Widget _buildWebLayout(BoxConstraints constraints) {
           children: [
             _buildUserSearchCard(isWeb: true, forWebLayout: true, availableHeight: constraints.maxHeight * 0.4),
             SizedBox(height: 24),
-            _buildHarshEventsCard(isWeb: true),  // ADD THIS
+            _buildHarshEventsCard(isWeb: true),
+            SizedBox(height: 24),
+            _buildScoreTrajectoryCard(isWeb: true),
             SizedBox(height: 24),
             _buildUserTripsCard(isWeb: true, forWebLayout: true, availableHeight: constraints.maxHeight * 0.4),
           ],
@@ -99,7 +105,13 @@ Widget _buildWebLayout(BoxConstraints constraints) {
       SizedBox(width: 24),
       Expanded(
         flex: 1,
-        child: _buildUserScoreCard(isWeb: true, forWebLayout: true),
+        child: Column(
+          children: [
+            _buildUserScoreCard(isWeb: true, forWebLayout: true),
+            SizedBox(height: 24),
+            _buildDriverDetailsCard(isWeb: true),
+          ],
+        ),
       ),
     ],
   );
@@ -124,7 +136,11 @@ Widget _buildMobileLayout(bool isWeb) {
       SizedBox(height: 24),
       _buildUserScoreCard(isWeb: isWeb),
       SizedBox(height: 24),
-      _buildHarshEventsCard(isWeb: isWeb),  // ADD THIS
+      _buildHarshEventsCard(isWeb: isWeb),
+      SizedBox(height: 24),
+      _buildScoreTrajectoryCard(isWeb: isWeb),
+      SizedBox(height: 24),
+      _buildDriverDetailsCard(isWeb: isWeb),
       SizedBox(height: 24),
       _buildUserTripsCard(isWeb: isWeb),
     ],
@@ -458,43 +474,134 @@ void _selectUser(Map<String, dynamic> user) {
   setState(() {
     _selectedUser = user;
     _searchedUserId = user['user_id'].toString();
-    
+
     // If we have analytics data, use it directly
     if (user.containsKey('analytics_data')) {
       Map<String, dynamic> analytics = user['analytics_data'];
-      
-      // Set the score data
+
+      // Calculate event totals from trip data
+      List<dynamic> trips = analytics['trips'] as List? ?? [];
+      int totalSuddenAccelerations = 0;
+      int totalSuddenDecelerations = 0;
+      int totalHardStops = 0;
+      int totalDangerousTurns = 0;
+      double totalSmoothness = 0;
+
+      for (var trip in trips) {
+        totalSuddenAccelerations += (trip['sudden_accelerations'] ?? 0) as int;
+        totalSuddenDecelerations += (trip['sudden_decelerations'] ?? 0) as int;
+        totalHardStops += (trip['hard_stops'] ?? 0) as int;
+        totalDangerousTurns += (trip['dangerous_turns'] ?? 0) as int;
+        totalSmoothness += (trip['smoothness_score'] ?? 85.0) as double;
+      }
+
+      double totalDistance = (analytics['total_distance_miles'] ?? 0.0).toDouble();
+      int totalTrips = trips.length;
+
+      // Calculate acceleration score based on sudden accelerations per 100 miles
+      // Industry standard: 0-2/100mi = Excellent, 2-5 = Good, 5-10 = Fair, 10+ = Poor
+      double accelEventsPerHundred = totalDistance > 0
+          ? (totalSuddenAccelerations / totalDistance) * 100
+          : 0;
+      double accelScore;
+      if (accelEventsPerHundred <= 1) {
+        accelScore = 95 + (1 - accelEventsPerHundred) * 5; // 95-100
+      } else if (accelEventsPerHundred <= 3) {
+        accelScore = 85 + (3 - accelEventsPerHundred) * 5; // 85-95
+      } else if (accelEventsPerHundred <= 6) {
+        accelScore = 70 + (6 - accelEventsPerHundred) * 5; // 70-85
+      } else if (accelEventsPerHundred <= 10) {
+        accelScore = 50 + (10 - accelEventsPerHundred) * 5; // 50-70
+      } else {
+        accelScore = (50 - (accelEventsPerHundred - 10) * 2).clamp(20, 50); // 20-50
+      }
+
+      // Calculate braking score based on sudden decelerations + hard stops per 100 miles
+      int totalBrakingEvents = totalSuddenDecelerations + totalHardStops;
+      double brakeEventsPerHundred = totalDistance > 0
+          ? (totalBrakingEvents / totalDistance) * 100
+          : 0;
+      double brakeScore;
+      if (brakeEventsPerHundred <= 1) {
+        brakeScore = 95 + (1 - brakeEventsPerHundred) * 5; // 95-100
+      } else if (brakeEventsPerHundred <= 3) {
+        brakeScore = 85 + (3 - brakeEventsPerHundred) * 5; // 85-95
+      } else if (brakeEventsPerHundred <= 6) {
+        brakeScore = 70 + (6 - brakeEventsPerHundred) * 5; // 70-85
+      } else if (brakeEventsPerHundred <= 10) {
+        brakeScore = 50 + (10 - brakeEventsPerHundred) * 5; // 50-70
+      } else {
+        brakeScore = (50 - (brakeEventsPerHundred - 10) * 2).clamp(20, 50); // 20-50
+      }
+
+      // Average smoothness score from trips (fallback if no trip data)
+      double avgSmoothness = totalTrips > 0 ? totalSmoothness / totalTrips : 85.0;
+
+      // Calculate frequency score using same benchmarks as backend
+      // This represents 35% of the overall score
+      double eventsPerHundred = (analytics['events_per_100_miles'] ?? 0).toDouble();
+      double frequencyScore;
+      if (eventsPerHundred <= 5.0) {
+        frequencyScore = 95;  // Exceptional
+      } else if (eventsPerHundred <= 15.0) {
+        frequencyScore = 85;  // Excellent
+      } else if (eventsPerHundred <= 30.0) {
+        frequencyScore = 75;  // Very Good
+      } else if (eventsPerHundred <= 50.0) {
+        frequencyScore = 65;  // Good
+      } else if (eventsPerHundred <= 80.0) {
+        frequencyScore = 55;  // Fair
+      } else if (eventsPerHundred <= 120.0) {
+        frequencyScore = 40;  // Poor
+      } else {
+        frequencyScore = 25;  // Dangerous
+      }
+
+      // Calculate average turn safety score from trips
+      double totalTurnSafetyScore = 0;
+      int tripsWithTurns = 0;
+      for (var trip in trips) {
+        double turnScore = (trip['turn_safety_score'] ?? 0).toDouble();
+        if (turnScore > 0) {
+          totalTurnSafetyScore += turnScore;
+          tripsWithTurns++;
+        }
+      }
+      double avgTurnSafetyScore = tripsWithTurns > 0
+          ? totalTurnSafetyScore / tripsWithTurns
+          : 85.0;  // Default when no turn data
+
+      // Set the score data matching backend's calculation
+      // Backend weights: frequency 35%, smoothness 25%, consistency 25%, turn 15%
       _userScore = {
         'score': analytics['overall_behavior_score'] ?? 0,
         'behavior_score': analytics['overall_behavior_score'] ?? 0,
-        'accel_score': (analytics['avg_gentle_acceleration_score'] ?? 0) / 100,
-        'brake_score': (analytics['avg_acceleration_consistency'] ?? 0) / 100,
+        'frequency_score': frequencyScore / 100, // Store as 0-1
+        'smoothness_score': avgSmoothness / 100, // Store as 0-1
+        'accel_score': accelScore / 100, // Legacy, for display purposes
+        'brake_score': brakeScore / 100, // Legacy, for display purposes
         'trip_score': (analytics['overall_behavior_score'] ?? 0) / 100,
         'speed_consistency': analytics['speed_consistency_score'] ?? 0,
-        'turn_quality': analytics['avg_turn_speed_score'] ?? 0,
+        'turn_quality': analytics['safe_turns_percentage'] ?? 0,
         'safe_turns_percentage': analytics['safe_turns_percentage'] ?? 0,
+        'turn_safety_score': avgTurnSafetyScore,
         'risk_level': analytics['risk_level'] ?? 'Unknown',
         'total_trips': analytics['total_trips'] ?? 0,
         'total_distance': analytics['total_distance_miles'] ?? 0,
+        'total_driving_time': analytics['total_driving_time_hours'] ?? 0,
+        'avg_trip_distance': analytics['avg_trip_distance_miles'] ?? 0,
+        'avg_trip_duration': analytics['avg_trip_duration_minutes'] ?? 0,
+        'total_harsh_events': analytics['total_harsh_events'] ?? 0,
+        'total_dangerous_events': analytics['total_dangerous_events'] ?? 0,
+        'events_per_100_miles': analytics['events_per_100_miles'] ?? 0,
         'updated_at': analytics['analysis_timestamp'] ?? DateTime.now().toIso8601String(),
       };
-      // In _selectUser, after setting _userScore, ADD:
-      // Extract total harsh events from analytics
-      if (analytics.containsKey('total_harsh_events')) {
-        analytics['total_sudden_accelerations'] = analytics['total_harsh_events'];
-      }
-      // These should already be in the data, but ensure they're available
-      analytics['total_sudden_accelerations'] = analytics['total_sudden_accelerations'] ?? 
-        (analytics['trips'] as List?)?.fold<int>(0, (sum, trip) => sum + ((trip['sudden_accelerations'] ?? 0) as int)) ?? 0;
-        
-      analytics['total_sudden_decelerations'] = analytics['total_sudden_decelerations'] ?? 
-        (analytics['trips'] as List?)?.fold(0, (sum, trip) => sum + ((trip['sudden_decelerations'] ?? 0) as int)) ?? 0;
-        
-      analytics['total_hard_stops'] = analytics['total_hard_stops'] ?? 
-        (analytics['trips'] as List?)?.fold(0, (sum, trip) => sum + ((trip['hard_stops'] ?? 0) as int)) ?? 0;
-        
-      analytics['total_dangerous_turns'] = analytics['total_dangerous_turns'] ?? 
-        (analytics['trips'] as List?)?.fold(0, (sum, trip) => sum + ((trip['dangerous_turns'] ?? 0) as int)) ?? 0;
+
+      // Store event totals in analytics for the harsh events card
+      analytics['total_sudden_accelerations'] = totalSuddenAccelerations;
+      analytics['total_sudden_decelerations'] = totalSuddenDecelerations;
+      analytics['total_hard_stops'] = totalHardStops;
+      analytics['total_dangerous_turns'] = totalDangerousTurns;
       
       // Set the trips data
       List<dynamic> rawTrips = analytics['trips'] as List? ?? [];
@@ -786,29 +893,39 @@ Widget _buildUserScoreCard({
                   Divider(),
                   SizedBox(height: 16),
 
-                  // Speed Consistency with % bar
+                  // Score components matching backend calculation
+                  // Backend weights: frequency 35%, smoothness 25%, consistency 25%, turn 15%
+
+                  // Event Frequency (35% weight) - from events per 100 miles
+                  if (_userScore!['frequency_score'] != null)
+                    _buildScoreDetailRow(
+                      'Event Frequency (35%)',
+                      (_userScore!['frequency_score'] * 100).toDouble()
+                    ),
+
+                  // Driving Smoothness (25% weight) - from acceleration/braking smoothness
+                  if (_userScore!['smoothness_score'] != null)
+                    _buildScoreDetailRow(
+                      'Driving Smoothness (25%)',
+                      (_userScore!['smoothness_score'] * 100).toDouble()
+                    ),
+
+                  // Speed Consistency (25% weight)
                   if (_userScore!['speed_consistency'] != null)
                     _buildScoreDetailRow(
-                      'Speed Consistency',
+                      'Speed Consistency (25%)',
                       _userScore!['speed_consistency'].toDouble()
                     ),
 
-                  // Braking with % bar
-                  if (_userScore!['brake_score'] != null)
+                  // Turn Safety (15% weight) - using turn_safety_score from backend
+                  if (_userScore!['turn_safety_score'] != null)
                     _buildScoreDetailRow(
-                      'Braking',
-                      (_userScore!['brake_score'] * 100).toDouble()
-                    ),
-
-                  // Acceleration with % bar
-                  if (_userScore!['accel_score'] != null)
-                    _buildScoreDetailRow(
-                      'Acceleration',
-                      (_userScore!['accel_score'] * 100).toDouble()
+                      'Turn Safety (15%)',
+                      (_userScore!['turn_safety_score']).toDouble()
                     ),
 
                   SizedBox(height: 16),
-                  
+
                   // Numerical metrics grouped together
                   Container(
                     padding: EdgeInsets.all(12),
@@ -1246,6 +1363,7 @@ Widget _buildMobileScoreRow(String label, int score) {
 
 
 Widget _buildScoreDetailRow(String label, double value) {
+  final int roundedValue = value.round();
   return Padding(
     padding: EdgeInsets.symmetric(vertical: 8),
     child: Row(
@@ -1257,14 +1375,14 @@ Widget _buildScoreDetailRow(String label, double value) {
         Expanded(
           flex: 3,
           child: LinearProgressIndicator(
-            value: value,
+            value: (value / 100).clamp(0.0, 1.0),
             backgroundColor: Colors.grey[200],
             valueColor: AlwaysStoppedAnimation<Color>(_getScoreColor(value)),
           ),
         ),
         SizedBox(width: 8),
         Text(
-          '$value%',
+          '$roundedValue%',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: _getScoreColor(value),
@@ -1760,6 +1878,794 @@ Future<void> _loadUserTrips(String userId) async {
       _isLoadingTrips = false;
       _searchError = 'Failed to load trips: $e';
     });
+  }
+}
+
+// Build score trajectory chart
+Widget _buildScoreTrajectoryCard({required bool isWeb}) {
+  if (_selectedUser == null || _userTrips.isEmpty) {
+    return SizedBox.shrink();
+  }
+
+  // Get scores from trips (most recent 10, reversed for chronological order)
+  List<double> tripScores = _userTrips
+      .take(10)
+      .map<double>((trip) => (trip['behavior_score'] ?? 0).toDouble())
+      .toList()
+      .reversed
+      .toList();
+
+  if (tripScores.isEmpty) return SizedBox.shrink();
+
+  return Card(
+    elevation: isWeb ? 4 : 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(isWeb ? 12 : 8),
+    ),
+    child: Padding(
+      padding: EdgeInsets.all(isWeb ? 24 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Score Trajectory',
+                style: TextStyle(
+                  fontSize: isWeb ? 20 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+              Text(
+                'Last ${tripScores.length} trips',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                maxY: 100,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 25,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[300],
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 35,
+                      interval: 25,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          '${value.toInt()}',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 25,
+                      getTitlesWidget: (value, meta) {
+                        if (value.toInt() >= tripScores.length) return Text('');
+                        return Text(
+                          'T${value.toInt() + 1}',
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: tripScores.asMap().entries
+                        .map((e) => FlSpot(e.key.toDouble(), e.value))
+                        .toList(),
+                    isCurved: true,
+                    color: Colors.blue.shade600,
+                    barWidth: 3,
+                    isStrokeCapRound: true,
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, barData, index) {
+                        return FlDotCirclePainter(
+                          radius: 4,
+                          color: Colors.blue.shade800,
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        );
+                      },
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.blue.shade200.withOpacity(0.5),
+                          Colors.blue.shade50.withOpacity(0.1),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (spot) => Colors.blue.shade800,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        return LineTooltipItem(
+                          'Trip ${spot.x.toInt() + 1}\nScore: ${spot.y.toStringAsFixed(0)}',
+                          TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 12),
+          // Trend indicator
+          _buildTrendIndicator(tripScores),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildTrendIndicator(List<double> scores) {
+  if (scores.length < 2) return SizedBox.shrink();
+
+  double firstHalf = scores.take(scores.length ~/ 2).fold(0.0, (a, b) => a + b) / (scores.length ~/ 2);
+  double secondHalf = scores.skip(scores.length ~/ 2).fold(0.0, (a, b) => a + b) / (scores.length - scores.length ~/ 2);
+  double trend = secondHalf - firstHalf;
+
+  IconData icon;
+  Color color;
+  String text;
+
+  if (trend > 3) {
+    icon = Icons.trending_up;
+    color = Colors.green;
+    text = 'Improving (+${trend.toStringAsFixed(1)})';
+  } else if (trend < -3) {
+    icon = Icons.trending_down;
+    color = Colors.red;
+    text = 'Declining (${trend.toStringAsFixed(1)})';
+  } else {
+    icon = Icons.trending_flat;
+    color = Colors.orange;
+    text = 'Stable';
+  }
+
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(icon, color: color, size: 20),
+      SizedBox(width: 8),
+      Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+    ],
+  );
+}
+
+// Build comprehensive driver details card
+Widget _buildDriverDetailsCard({required bool isWeb}) {
+  if (_selectedUser == null || _userScore == null) {
+    return SizedBox.shrink();
+  }
+
+  final analytics = _selectedUser!['analytics_data'];
+  if (analytics == null) return SizedBox.shrink();
+
+  return Card(
+    elevation: isWeb ? 4 : 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(isWeb ? 12 : 8),
+    ),
+    child: Padding(
+      padding: EdgeInsets.all(isWeb ? 24 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Driver Report',
+                style: TextStyle(
+                  fontSize: isWeb ? 20 : 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade800,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _generateDriverPDF(),
+                icon: Icon(Icons.picture_as_pdf, size: 18),
+                label: Text('Download PDF'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 20),
+
+          // Driver info header
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.blue.shade700,
+                  child: Text(
+                    (analytics['user_name'] ?? 'U')[0].toUpperCase(),
+                    style: TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        analytics['user_name'] ?? 'Unknown Driver',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        analytics['user_email'] ?? '',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'User ID: ${analytics['user_id'] ?? _searchedUserId}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 20),
+
+          // Statistics grid
+          Text(
+            'Driving Statistics',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+          ),
+          SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildStatChip(Icons.route, 'Total Distance', '${(_userScore!['total_distance'] ?? 0).toStringAsFixed(1)} mi'),
+              _buildStatChip(Icons.timer, 'Driving Time', '${(_userScore!['total_driving_time'] ?? 0).toStringAsFixed(1)} hrs'),
+              _buildStatChip(Icons.directions_car, 'Total Trips', '${_userScore!['total_trips'] ?? 0}'),
+              _buildStatChip(Icons.straighten, 'Avg Trip Distance', '${(_userScore!['avg_trip_distance'] ?? 0).toStringAsFixed(1)} mi'),
+              _buildStatChip(Icons.access_time, 'Avg Trip Duration', '${(_userScore!['avg_trip_duration'] ?? 0).toStringAsFixed(0)} min'),
+              _buildStatChip(Icons.warning_amber, 'Events/100mi', '${(_userScore!['events_per_100_miles'] ?? 0).toStringAsFixed(1)}'),
+            ],
+          ),
+          SizedBox(height: 16),
+
+          // Last updated
+          Text(
+            'Report generated: ${DateFormat('MMM d, yyyy h:mm a').format(DateTime.now())}',
+            style: TextStyle(fontSize: 11, color: Colors.grey[500], fontStyle: FontStyle.italic),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildStatChip(IconData icon, String label, String value) {
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.grey[100],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.grey[300]!),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: Colors.blue[700]),
+        SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
+            Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildScoreBreakdownRow(String label, double score) {
+  return Padding(
+    padding: EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(label, style: TextStyle(fontSize: 14)),
+        ),
+        Expanded(
+          flex: 3,
+          child: Stack(
+            children: [
+              Container(
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: (score / 100).clamp(0.0, 1.0),
+                child: Container(
+                  height: 20,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _getScoreColor(score),
+                        _getScoreColor(score).withOpacity(0.7),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 12),
+        SizedBox(
+          width: 45,
+          child: Text(
+            '${score.toStringAsFixed(0)}%',
+            style: TextStyle(fontWeight: FontWeight.bold, color: _getScoreColor(score)),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Generate and download PDF report for ISP
+Future<void> _generateDriverPDF() async {
+  if (_selectedUser == null || _userScore == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('No driver data available to export')),
+    );
+    return;
+  }
+
+  final analytics = _selectedUser!['analytics_data'];
+  if (analytics == null) return;
+
+  final now = DateTime.now();
+  final driverName = analytics['user_name'] ?? 'Unknown';
+  final safeDriverName = driverName.replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(' ', '_');
+  final fileName = 'NoTrackDrive_ISP_Report_${safeDriverName}_${DateFormat('yyyy-MM-dd_HHmm').format(now)}.pdf';
+
+  // Get trip scores for chart
+  List<double> tripScores = _userTrips
+      .take(10)
+      .map<double>((trip) => (trip['behavior_score'] ?? 0).toDouble())
+      .toList()
+      .reversed
+      .toList();
+
+  final pdf = pw.Document();
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.letter,
+      margin: pw.EdgeInsets.all(40),
+      build: (pw.Context context) => [
+        // Header
+        pw.Container(
+          padding: pw.EdgeInsets.all(20),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.blue800,
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('NoTrackDrive', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Insurance Provider Driver Report', style: pw.TextStyle(fontSize: 14, color: PdfColors.white)),
+                ],
+              ),
+              pw.Text('Confidential', style: pw.TextStyle(fontSize: 12, color: PdfColors.white, fontStyle: pw.FontStyle.italic)),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 20),
+
+        // Driver info
+        pw.Container(
+          padding: pw.EdgeInsets.all(16),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.blue200),
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Row(
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('Driver: $driverName', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Email: ${analytics['user_email'] ?? 'N/A'}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                  pw.Text('User ID: ${analytics['user_id'] ?? _searchedUserId}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                ],
+              ),
+              pw.Spacer(),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('Generated: ${DateFormat('MMMM d, yyyy').format(now)}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                  pw.Text('Time: ${DateFormat('h:mm a').format(now)}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 24),
+
+        // Overall Score Box
+        pw.Container(
+          padding: pw.EdgeInsets.all(20),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.blue, width: 2),
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            children: [
+              pw.Column(
+                children: [
+                  pw.Text('OVERALL SAFETY SCORE', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                  pw.SizedBox(height: 8),
+                  pw.Text('${(_userScore!['score'] ?? 0).toInt()}', style: pw.TextStyle(fontSize: 48, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                  pw.Text('out of 100', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+                  pw.SizedBox(height: 8),
+                  pw.Container(
+                    padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: pw.BoxDecoration(
+                      color: _getPdfRiskColor(_userScore!['risk_level']),
+                      borderRadius: pw.BorderRadius.circular(12),
+                    ),
+                    child: pw.Text(_userScore!['risk_level'] ?? 'Unknown', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 24),
+
+        // Statistics Section
+        pw.Text('Driving Statistics', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+        pw.Divider(color: PdfColors.blue200),
+        pw.SizedBox(height: 8),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            _buildPdfStatBox('Total Trips', '${_userScore!['total_trips'] ?? 0}'),
+            _buildPdfStatBox('Total Distance', '${(_userScore!['total_distance'] ?? 0).toStringAsFixed(1)} mi'),
+            _buildPdfStatBox('Driving Time', '${(_userScore!['total_driving_time'] ?? 0).toStringAsFixed(1)} hrs'),
+          ],
+        ),
+        pw.SizedBox(height: 8),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            _buildPdfStatBox('Avg Trip Distance', '${(_userScore!['avg_trip_distance'] ?? 0).toStringAsFixed(1)} mi'),
+            _buildPdfStatBox('Avg Trip Duration', '${(_userScore!['avg_trip_duration'] ?? 0).toStringAsFixed(0)} min'),
+            _buildPdfStatBox('Events/100mi', '${(_userScore!['events_per_100_miles'] ?? 0).toStringAsFixed(1)}'),
+          ],
+        ),
+        pw.SizedBox(height: 24),
+
+        // Score Breakdown (matching backend calculation weights)
+        pw.Text('Score Breakdown', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+        pw.Divider(color: PdfColors.blue200),
+        pw.SizedBox(height: 8),
+        _buildPdfScoreRow('Event Frequency (35%)', ((_userScore!['frequency_score'] ?? 0.85) * 100).toDouble()),
+        _buildPdfScoreRow('Driving Smoothness (25%)', ((_userScore!['smoothness_score'] ?? 0.85) * 100).toDouble()),
+        _buildPdfScoreRow('Speed Consistency (25%)', (_userScore!['speed_consistency'] ?? 0).toDouble()),
+        _buildPdfScoreRow('Turn Safety (15%)', (_userScore!['turn_safety_score'] ?? 85).toDouble()),
+        pw.SizedBox(height: 24),
+
+        // Score Trajectory
+        if (tripScores.isNotEmpty) ...[
+          pw.Text('Score Trajectory (Last ${tripScores.length} Trips)', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+          pw.Divider(color: PdfColors.blue200),
+          pw.SizedBox(height: 8),
+          _buildPdfScoreChart(tripScores, pdf),
+          pw.SizedBox(height: 24),
+        ],
+
+        // Harsh Events Summary
+        pw.Text('Harsh Events Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+        pw.Divider(color: PdfColors.blue200),
+        pw.SizedBox(height: 8),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+          children: [
+            _buildPdfEventBox('Sudden Accelerations', analytics['total_sudden_accelerations'] ?? 0),
+            _buildPdfEventBox('Sudden Decelerations', analytics['total_sudden_decelerations'] ?? 0),
+            _buildPdfEventBox('Hard Stops', analytics['total_hard_stops'] ?? 0),
+            _buildPdfEventBox('Dangerous Turns', analytics['total_dangerous_turns'] ?? 0),
+          ],
+        ),
+        pw.SizedBox(height: 24),
+
+        // Recent Trips Table
+        if (_userTrips.isNotEmpty) ...[
+          pw.Text('Recent Trips', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+          pw.Divider(color: PdfColors.blue200),
+          pw.SizedBox(height: 8),
+          pw.TableHelper.fromTextArray(
+            headerStyle: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+            headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
+            cellStyle: pw.TextStyle(fontSize: 10),
+            cellPadding: pw.EdgeInsets.all(6),
+            headers: ['Date', 'Distance', 'Duration', 'Score'],
+            data: _userTrips.take(10).map((trip) {
+              String dateStr = trip['end_time'] ?? '';
+              String formattedDate = 'N/A';
+              if (dateStr.isNotEmpty) {
+                try {
+                  DateTime date = DateTime.parse(dateStr).toLocal();
+                  formattedDate = DateFormat('MMM d, yyyy').format(date);
+                } catch (e) {}
+              }
+              return [
+                formattedDate,
+                '${(trip['distance'] ?? 0).toStringAsFixed(1)} mi',
+                '${(trip['duration'] ?? 0).toStringAsFixed(0)} min',
+                '${(trip['behavior_score'] ?? 0).toStringAsFixed(0)}',
+              ];
+            }).toList(),
+          ),
+        ],
+
+        pw.SizedBox(height: 30),
+        pw.Center(
+          child: pw.Text(
+            'Generated by NoTrackDrive Insurance Portal',
+            style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500, fontStyle: pw.FontStyle.italic),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  final pdfBytes = await pdf.save();
+  await savePdfFile(pdfBytes, fileName);
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('PDF report downloaded: $fileName'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+}
+
+pw.Widget _buildPdfStatBox(String label, String value) {
+  return pw.Container(
+    padding: pw.EdgeInsets.all(12),
+    decoration: pw.BoxDecoration(
+      color: PdfColors.grey100,
+      borderRadius: pw.BorderRadius.circular(8),
+    ),
+    child: pw.Column(
+      children: [
+        pw.Text(label, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+        pw.SizedBox(height: 4),
+        pw.Text(value, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildPdfScoreRow(String label, double score) {
+  return pw.Container(
+    margin: pw.EdgeInsets.only(bottom: 6),
+    child: pw.Row(
+      children: [
+        pw.Expanded(
+          flex: 2,
+          child: pw.Text(label, style: pw.TextStyle(fontSize: 11)),
+        ),
+        pw.Expanded(
+          flex: 3,
+          child: pw.Stack(
+            children: [
+              pw.Container(
+                height: 16,
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.grey200,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+              ),
+              pw.Container(
+                height: 16,
+                width: (score / 100).clamp(0.0, 1.0) * 200,
+                decoration: pw.BoxDecoration(
+                  color: _getPdfScoreColor(score),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(width: 12),
+        pw.Text('${score.toStringAsFixed(0)}%', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildPdfEventBox(String label, int count) {
+  return pw.Container(
+    padding: pw.EdgeInsets.all(10),
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(color: PdfColors.grey300),
+      borderRadius: pw.BorderRadius.circular(8),
+    ),
+    child: pw.Column(
+      children: [
+        pw.Text('$count', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+        pw.SizedBox(height: 4),
+        pw.Text(label, style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600), textAlign: pw.TextAlign.center),
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildPdfScoreChart(List<double> scoreData, pw.Document pdfDoc) {
+  if (scoreData.isEmpty) {
+    return pw.Text('No data available', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500));
+  }
+
+  const double chartWidth = 450;
+  const double chartHeight = 100;
+  const double leftMargin = 30;
+  const double bottomMargin = 20;
+  const double topMargin = 10;
+
+  final helveticaFont = PdfFont.helvetica(pdfDoc.document);
+
+  return pw.Container(
+    height: chartHeight + bottomMargin + topMargin,
+    width: chartWidth + leftMargin,
+    child: pw.CustomPaint(
+      size: PdfPoint(chartWidth + leftMargin, chartHeight + bottomMargin + topMargin),
+      painter: (PdfGraphics canvas, PdfPoint size) {
+        final double graphWidth = chartWidth - 10;
+        final double graphHeight = chartHeight;
+
+        // Draw Y-axis labels and grid lines
+        for (int i = 0; i <= 4; i++) {
+          final double y = topMargin + graphHeight - (i * graphHeight / 4);
+          final int label = i * 25;
+
+          canvas
+            ..setColor(PdfColors.grey300)
+            ..drawLine(leftMargin, y, leftMargin + graphWidth, y)
+            ..strokePath();
+
+          canvas
+            ..setColor(PdfColors.grey700)
+            ..drawString(helveticaFont, 8, '$label', leftMargin - 22, y - 3);
+        }
+
+        if (scoreData.length > 1) {
+          final double xStep = graphWidth / (scoreData.length - 1);
+
+          canvas.setColor(PdfColors.blue);
+          for (int i = 0; i < scoreData.length - 1; i++) {
+            final double x1 = leftMargin + i * xStep;
+            final double y1 = topMargin + graphHeight - (scoreData[i].clamp(0, 100) / 100 * graphHeight);
+            final double x2 = leftMargin + (i + 1) * xStep;
+            final double y2 = topMargin + graphHeight - (scoreData[i + 1].clamp(0, 100) / 100 * graphHeight);
+
+            canvas
+              ..setLineWidth(2)
+              ..drawLine(x1, y1, x2, y2)
+              ..strokePath();
+          }
+
+          for (int i = 0; i < scoreData.length; i++) {
+            final double x = leftMargin + i * xStep;
+            final double y = topMargin + graphHeight - (scoreData[i].clamp(0, 100) / 100 * graphHeight);
+
+            canvas
+              ..setColor(PdfColors.blue800)
+              ..drawEllipse(x, y, 3, 3)
+              ..fillPath();
+
+            canvas
+              ..setColor(PdfColors.grey600)
+              ..drawString(helveticaFont, 7, 'T${i + 1}', x - 4, topMargin + graphHeight + 6);
+          }
+        } else if (scoreData.length == 1) {
+          final double x = leftMargin + graphWidth / 2;
+          final double y = topMargin + graphHeight - (scoreData[0].clamp(0, 100) / 100 * graphHeight);
+
+          canvas
+            ..setColor(PdfColors.blue800)
+            ..drawEllipse(x, y, 4, 4)
+            ..fillPath();
+        }
+      },
+    ),
+  );
+}
+
+PdfColor _getPdfScoreColor(double score) {
+  if (score >= 80) return PdfColors.green;
+  if (score >= 60) return PdfColors.lightGreen;
+  if (score >= 40) return PdfColors.orange;
+  return PdfColors.red;
+}
+
+PdfColor _getPdfRiskColor(String? riskLevel) {
+  switch (riskLevel?.toLowerCase()) {
+    case 'low':
+      return PdfColors.green;
+    case 'moderate':
+      return PdfColors.orange;
+    case 'high':
+      return PdfColors.red;
+    default:
+      return PdfColors.grey;
   }
 }
 }

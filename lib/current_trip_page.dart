@@ -454,8 +454,27 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               print('📊 Web: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
             }
 
-            // Sanity check: reject unrealistic speeds
-            if (speedMph > 150) speedMph = currentSpeed;
+            // Contextual speed validation: reject physically impossible speeds
+            bool usedGpsSpeed = position.speed != null && position.speed! > 0;
+            if (speedMph > 150) {
+              print('⚠️ Web: Rejecting extreme speed spike: ${speedMph.toStringAsFixed(1)} mph');
+              speedMph = currentSpeed;
+            } else if (_pointCounter >= 1 && lastPosition != null) {
+              double speedChange = (speedMph - currentSpeed).abs();
+              // Max physically possible change in 2 seconds (~27 mph)
+              if (speedChange > 27.0 && speedMph > 10.0) {
+                double clampedSpeed = currentSpeed + (speedMph > currentSpeed ? 27.0 : -27.0);
+                if (clampedSpeed < 0) clampedSpeed = 0;
+                print('⚠️ Web: Speed jump ${currentSpeed.toStringAsFixed(1)}->${speedMph.toStringAsFixed(1)} mph impossible, clamped to ${clampedSpeed.toStringAsFixed(1)}');
+                speedMph = clampedSpeed;
+              }
+            }
+
+            // GPS warmup: first 10 points often have erratic readings
+            if (_pointCounter < 10 && speedMph > 30.0 && (position.accuracy > 15.0 || !usedGpsSpeed)) {
+              print('⚠️ Web: GPS warm-up period (point $_pointCounter/10), clamping suspicious speed ${speedMph.toStringAsFixed(1)} mph');
+              speedMph = 0.0;
+            }
 
             // Calculate distance from last position
             double segmentDistance = 0.0;
@@ -564,7 +583,7 @@ class CurrentTripPageState extends State<CurrentTripPage> {
                     'p': _pointCounter,
                     'speed_mph': speedMph,
                     'accuracy': position.accuracy,
-                    'speed_source': position.speed != null ? 'gps' : 'calculated',
+                    'speed_source': usedGpsSpeed ? 'gps' : 'calculated',
                   });
 
                   print('📊 Delta point stored - Buffer size: ${_webDeltaPoints.length}/25');
@@ -666,8 +685,27 @@ class CurrentTripPageState extends State<CurrentTripPage> {
               print('📊 Mobile: Calculated speed: ${speedMph.toStringAsFixed(1)} mph from ${distanceMeters.toStringAsFixed(1)}m');
             }
 
-            // Sanity check
-            if (speedMph > 150) speedMph = currentSpeed;
+            // Contextual speed validation: reject physically impossible speeds
+            // Max real-world acceleration ~6 m/s² ≈ ~13.4 mph/s, over 2s = ~27 mph change max
+            if (speedMph > 150) {
+              print('⚠️ Mobile: Rejecting extreme speed spike: ${speedMph.toStringAsFixed(1)} mph');
+              speedMph = currentSpeed;
+            } else if (_pointCounter >= 1 && lastPosition != null) {
+              double speedChange = (speedMph - currentSpeed).abs();
+              // Max physically possible change in 2 seconds (~27 mph)
+              if (speedChange > 27.0 && speedMph > 10.0) {
+                double clampedSpeed = currentSpeed + (speedMph > currentSpeed ? 27.0 : -27.0);
+                if (clampedSpeed < 0) clampedSpeed = 0;
+                print('⚠️ Mobile: Speed jump ${currentSpeed.toStringAsFixed(1)}->${speedMph.toStringAsFixed(1)} mph impossible, clamped to ${clampedSpeed.toStringAsFixed(1)}');
+                speedMph = clampedSpeed;
+              }
+            }
+
+            // GPS warmup: first 10 points often have erratic readings
+            if (_pointCounter < 10 && speedMph > 30.0 && (position.accuracy > 15.0 || !usedGpsSpeed)) {
+              print('⚠️ Mobile: GPS warm-up period (point $_pointCounter/10), clamping suspicious speed ${speedMph.toStringAsFixed(1)} mph');
+              speedMph = 0.0;
+            }
 
             // Calculate distance from last position
             double segmentDistance = 0.0;
@@ -687,9 +725,23 @@ class CurrentTripPageState extends State<CurrentTripPage> {
             // UPDATE STATE - THIS IS CRITICAL
             setState(() {
               currentSpeed = speedMph;
-              if (speedMph > maxSpeed) {
+
+              // Smart max speed filtering (matches web platform)
+              bool isValidSpeedReading = speedMph <= 120.0 &&
+                                          _pointCounter >= 10 &&
+                                          position.accuracy <= 20.0;
+
+              if (isValidSpeedReading && speedMph > maxSpeed) {
                 maxSpeed = speedMph;
+                print('🏎️ Mobile: New max speed: ${maxSpeed.toStringAsFixed(1)} mph (accuracy: ${position.accuracy.toStringAsFixed(1)}m)');
+              } else if (speedMph > 120.0) {
+                print('⚠️ Mobile: Ignoring erratic speed for max: ${speedMph.toStringAsFixed(1)} mph');
+              } else if (_pointCounter < 10) {
+                print('⚠️ Mobile: GPS warm-up period: ignoring for max speed (point $_pointCounter/10)');
+              } else if (position.accuracy > 20.0) {
+                print('⚠️ Mobile: Poor GPS accuracy: ${position.accuracy.toStringAsFixed(1)}m - ignoring for max');
               }
+
               _pointCounter++;
 
               // Accumulate distance
