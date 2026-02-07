@@ -4,9 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'ipconfig.dart';
-import 'trip_helper.dart';
 import 'geocodingutils.dart';
-import 'dart:math';
 
 // AdminHomePage is the main dashboard for administrators, providing:
 // - System statistics overview
@@ -23,7 +21,10 @@ class AdminHomePage extends StatefulWidget {
 
 class _AdminHomePageState extends State<AdminHomePage> {
   // STATE MANAGEMENT SECTION
-  
+
+  // Admin name for personalized greeting
+  String _adminName = '';
+
   // Quick Stats State - Tracks system-wide statistics
   Map<String, dynamic> _quickStats = {
     'total_users': 0,
@@ -32,11 +33,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
   };
   bool _isLoadingStats = false;
   String _statsError = '';
-
-  // Server Information State - Stores server configuration details
-  Map<String, dynamic>? _serverInfo;
-  bool _isLoadingServerInfo = false;
-  String _serverInfoError = '';
 
   // Insurance Search State - Manages insurance company search functionality
   List<Map<String, dynamic>> _insuranceResults = [];
@@ -53,15 +49,27 @@ class _AdminHomePageState extends State<AdminHomePage> {
   // Account Creation State - Manages form state for new account creation
   final _createAccountFormKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-    // Geocoding state for driver creation
+  final _passwordController = TextEditingController();
+
+  // Driver-specific controllers
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _zipcodeController = TextEditingController();  // ✅ Dedicated zipcode controller
   bool _isGeocodingZipcode = false;
   bool? _zipcodeValidAdmin;
   CityCoordinates? _basePointAdmin;
-  final _passwordController = TextEditingController();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
+
+  // Admin-specific controllers
   final _adminIdController = TextEditingController();
   final _serverNumberController = TextEditingController();
+
+  // ISP-specific controllers
+  final _companyNameController = TextEditingController();
+  final _stateController = TextEditingController();
+  final _contactPersonController = TextEditingController();
+  final _contactEmailController = TextEditingController();
+  final _contactPhoneController = TextEditingController();
+  final _licenseNumberController = TextEditingController();
 
   String _selectedRole = 'user'; // Default role selection
   bool _isCreatingAccount = false;
@@ -79,17 +87,35 @@ class _AdminHomePageState extends State<AdminHomePage> {
   void initState() {
     super.initState();
     // Load initial data when widget is created
+    _loadAdminName();
     _fetchQuickStats();
-    _fetchServerInfo();
     // Add listener for zipcode geocoding when creating drivers
-    _adminIdController.addListener(_onAdminZipcodeChanged);
+    _zipcodeController.addListener(_onAdminZipcodeChanged);  // ✅ Use dedicated controller
+  }
+
+  Future<void> _loadAdminName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userDataStr = prefs.getString('user_data');
+      if (userDataStr != null) {
+        final userData = jsonDecode(userDataStr);
+        final name = userData['name'] ?? '';
+        if (name.isNotEmpty && mounted) {
+          setState(() {
+            _adminName = name.split(' ').first;
+          });
+        }
+      }
+    } catch (e) {
+      print('Could not load admin name: $e');
+    }
   }
 
   // Debounced zipcode geocoding for admin creating drivers
   void _onAdminZipcodeChanged() {
     if (_selectedRole != 'user') return;
-    
-    final zipcode = _adminIdController.text.trim();
+
+    final zipcode = _zipcodeController.text.trim();  // ✅ Use dedicated controller
     
     if (zipcode.isEmpty) {
       setState(() {
@@ -106,7 +132,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
     
     if (isValid && zipcode.length == 5) {
       Future.delayed(Duration(milliseconds: 800), () {
-        if (_adminIdController.text.trim() == zipcode) {
+        if (_zipcodeController.text.trim() == zipcode) {  // ✅ Use dedicated controller
           _performAdminGeocoding(zipcode);
         }
       });
@@ -144,14 +170,22 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
   @override
   void dispose() {
-    _adminIdController.removeListener(_onAdminZipcodeChanged);
+    _zipcodeController.removeListener(_onAdminZipcodeChanged);
     // Clean up all controllers to prevent memory leaks
     _emailController.dispose();
     _passwordController.dispose();
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _zipcodeController.dispose();
     _adminIdController.dispose();
     _serverNumberController.dispose();
+    // ISP controllers
+    _companyNameController.dispose();
+    _stateController.dispose();
+    _contactPersonController.dispose();
+    _contactEmailController.dispose();
+    _contactPhoneController.dispose();
+    _licenseNumberController.dispose();
     super.dispose();
   }
 
@@ -192,9 +226,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
                       _buildWebDashboard(isLargeScreen, isMediumScreen)
                     else
                       _buildMobileDashboard(),
-                    SizedBox(height: isLargeScreen ? 32 : 16),
-                    // Server status information
-                    _buildServerStatusCard(isWeb: isWeb),
                   ],
                 ),
               ),
@@ -214,7 +245,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
         children: [
           Icon(Icons.admin_panel_settings, size: 32),
           SizedBox(width: 12),
-          Text('Admin Dashboard', style: TextStyle(fontSize: 24)),
+          Text(
+            _adminName.isNotEmpty ? 'Welcome, $_adminName' : 'Admin Dashboard',
+            style: TextStyle(fontSize: 24),
+          ),
         ],
       ),
       elevation: 4,
@@ -224,7 +258,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
           icon: Icon(Icons.refresh),
           onPressed: () {
             _fetchQuickStats();
-            _fetchServerInfo();
           },
           tooltip: 'Refresh Data',
         ),
@@ -301,109 +334,24 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ],
         ),
-        // Additional data grid for large screens
-        if (isLargeScreen) SizedBox(height: 32),
-        if (isLargeScreen) _buildWebDataGrid(),
       ],
     );
   }
 
-  // Builds the detailed data grid for web view
-  Widget _buildWebDataGrid() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'System Overview',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade800,
-              ),
-            ),
-            SizedBox(height: 16),
-            SizedBox(
-              height: 300,
-              child: Row(
-                children: [
-                  // Recent activity panel
-                  Expanded(
-                    flex: 2,
-                    child: Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Recent Activity',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Expanded(
-                              child: ListView.builder(
-                                itemCount: 10,
-                                itemBuilder: (context, index) => ListTile(
-                                  leading: Icon(Icons.notification_important, size: 20),
-                                  title: Text('System update ${index + 1}'),
-                                  subtitle: Text('${index + 5} minutes ago'),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16),
-                  // User distribution panel
-                  Expanded(
-                    flex: 3,
-                    child: Card(
-                      elevation: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'User Distribution',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Expanded(
-                              child: Center(
-                                child: Icon(
-                                  Icons.pie_chart,
-                                  size: 100,
-                                  color: Colors.blue,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  String _formatRelativeTime(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(isoString);
+      final now = DateTime.now().toUtc();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      return '${(diff.inDays / 7).floor()}w ago';
+    } catch (_) {
+      return '';
+    }
   }
 
   // MOBILE COMPONENTS SECTION
@@ -620,70 +568,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
     );
   }
 
-  // Builds the server status information card
-  Widget _buildServerStatusCard({required bool isWeb}) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Server Information',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade800,
-              ),
-            ),
-            SizedBox(height: 16),
-            if (_isLoadingServerInfo)
-              Center(child: CircularProgressIndicator())
-            else if (_serverInfoError.isNotEmpty)
-              Center(child: Text(_serverInfoError))
-            else if (_serverInfo != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildServerInfoItem('Base URL', _serverInfo!['base_url']),
-                  _buildServerInfoItem('Port', _serverInfo!['port']),
-                  _buildServerInfoItem('API Key', '••••••••••••••••'),
-                ],
-              ),
-            SizedBox(height: 16),
-            // Server status indicator
-            FutureBuilder<bool>(
-              future: _checkServerStatus(),
-              builder: (context, snapshot) {
-                return Row(
-                  children: [
-                    Icon(
-                      snapshot.data == true ? Icons.check_circle : Icons.error,
-                      color: snapshot.data == true ? Colors.green : Colors.red,
-                      size: 40,
-                    ),
-                    SizedBox(width: 16),
-                    Text(
-                      snapshot.data == true
-                          ? 'Server is online and running'
-                          : 'Server is offline',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Builds the welcome card for mobile view
   Widget _buildWelcomeCard({required bool isWeb}) {
     final isLargeScreen = MediaQuery.of(context).size.width > 600;
@@ -718,7 +602,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Admin Dashboard',
+                      _adminName.isNotEmpty ? 'Welcome, $_adminName' : 'Admin Dashboard',
                       style: TextStyle(
                         fontSize: isLargeScreen ? 24 : 20,
                         fontWeight: FontWeight.bold,
@@ -744,22 +628,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   // UTILITY COMPONENTS SECTION
-
-  // Builds a server info display row
-  Widget _buildServerInfoItem(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          Text(value, style: TextStyle(fontSize: 16)),
-        ],
-      ),
-    );
-  }
 
   // Builds a statistic display item with icon
   Widget _buildStatItem(
@@ -810,15 +678,17 @@ class _AdminHomePageState extends State<AdminHomePage> {
     if (isWeb) {
       showDialog(
         context: context,
-        builder: (context) => Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 600,
-              maxHeight: MediaQuery.of(context).size.height * 0.9,
-            ),
-            child: Dialog(
-              insetPadding: EdgeInsets.all(20),
-              child: _buildCreateAccountForm(),
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 600,
+                maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
+              ),
+              child: Dialog(
+                insetPadding: EdgeInsets.all(20),
+                child: _buildCreateAccountForm(dialogSetState),
+              ),
             ),
           ),
         ),
@@ -828,21 +698,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (context) => Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          child: DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.7,
-            minChildSize: 0.5,
-            maxChildSize: 0.9,
-            builder: (context, scrollController) {
-              return SingleChildScrollView(
-                controller: scrollController,
-                child: _buildCreateAccountForm(),
-              );
-            },
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.9,
+            ),
+            child: DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              builder: (context, scrollController) {
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  child: _buildCreateAccountForm(dialogSetState),
+                );
+              },
+            ),
           ),
         ),
       );
@@ -850,7 +722,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
   }
 
   // Builds the account creation form with role-specific fields
-  Widget _buildCreateAccountForm() {
+  Widget _buildCreateAccountForm(StateSetter dialogSetState) {
     final isWeb = kIsWeb;
     final isLargeScreen = MediaQuery.of(context).size.width > 600;
 
@@ -860,12 +732,13 @@ class _AdminHomePageState extends State<AdminHomePage> {
         borderRadius: BorderRadius.circular(isWeb ? 16 : 12),
       ),
       padding: EdgeInsets.all(isWeb ? 24 : 16),
-      child: Form(
-        key: _createAccountFormKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: SingleChildScrollView(
+        child: Form(
+          key: _createAccountFormKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Header section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -915,14 +788,29 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   ),
                 ],
                 onChanged: (value) {
-                  setState(() {
-                    _selectedRole = value!;
-                    // Clear form fields when role changes
-                    _firstNameController.clear();
-                    _lastNameController.clear();
-                    _adminIdController.clear();
-                    _serverNumberController.clear();
-                  });
+                  if (value == null) return;
+
+                  // Update parent state
+                  _selectedRole = value;
+                  _emailController.clear();
+                  _passwordController.clear();
+                  _firstNameController.clear();
+                  _lastNameController.clear();
+                  _zipcodeController.clear();
+                  _adminIdController.clear();
+                  _serverNumberController.clear();
+                  _companyNameController.clear();
+                  _stateController.clear();
+                  _contactPersonController.clear();
+                  _contactEmailController.clear();
+                  _contactPhoneController.clear();
+                  _licenseNumberController.clear();
+                  _basePointAdmin = null;
+                  _zipcodeValidAdmin = null;
+                  _createAccountError = '';
+
+                  // Rebuild the dialog UI
+                  dialogSetState(() {});
                 },
               ),
             ),
@@ -930,6 +818,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
             // Dynamic form fields based on selected role
             Column(
+              key: ValueKey('role_fields_$_selectedRole'),
               children: [
                 // Common fields (email and password)
                 _buildFormField(
@@ -991,7 +880,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 //     },
                 //   ),
                 // ],
-                //revert to above code if below fails
+                // ✅ DRIVER FIELDS (Clean and proper)
                 if (_selectedRole == 'user') ...[
                   _buildFormField(
                     controller: _firstNameController,
@@ -1021,7 +910,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildFormField(
-                        controller: _adminIdController,  // Reuse this controller for zipcode
+                        controller: _zipcodeController,  // ✅ Dedicated zipcode controller
                         label: 'Zipcode',
                         icon: Icons.location_on,
                         validator: (value) {
@@ -1078,9 +967,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   ),
                 ],
 
+                // ✅ ISP FIELDS (Complete and proper)
                 if (_selectedRole == 'insurance') ...[
                   _buildFormField(
-                    controller: _firstNameController,
+                    controller: _companyNameController,
                     label: 'Company Name',
                     icon: Icons.business,
                     validator: (value) {
@@ -1092,12 +982,63 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   ),
                   SizedBox(height: 12),
                   _buildFormField(
-                    controller: _lastNameController,
-                    label: 'State',
-                    icon: Icons.location_on,
+                    controller: _stateController,
+                    label: 'Primary State',
+                    icon: Icons.location_city,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter state';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildFormField(
+                    controller: _contactPersonController,
+                    label: 'Contact Person Name',
+                    icon: Icons.person,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter contact person name';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildFormField(
+                    controller: _contactEmailController,
+                    label: 'Contact Email',
+                    icon: Icons.email,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter contact email';
+                      }
+                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildFormField(
+                    controller: _contactPhoneController,
+                    label: 'Contact Phone',
+                    icon: Icons.phone,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter contact phone';
+                      }
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12),
+                  _buildFormField(
+                    controller: _licenseNumberController,
+                    label: 'Insurance License Number',
+                    icon: Icons.verified,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter license number';
                       }
                       return null;
                     },
@@ -1199,6 +1140,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1376,170 +1318,262 @@ class _AdminHomePageState extends State<AdminHomePage> {
   //     ),
   //   );
   // }
-  // revert to above code if below fails
+  // Shows user details dialog, fetching analytics for drivers on-demand
   void _showUserDetailsDialog(Map<String, dynamic> user) {
     final isWeb = kIsWeb;
     final maxDialogWidth = isWeb ? 800.0 : double.infinity;
+    final isDriver = user['role'] == 'driver';
+    final isProvider = user['role'] == 'provider';
 
-    // Check if this is a driver with analytics data
-    bool hasAnalytics = user.containsKey('behavior_score');
+    // Display name: use company name for providers, full name for drivers
+    String displayName;
+    if (isProvider) {
+      // Try metadata first for company name, fall back to first+last
+      String? companyName;
+      if (user['metadata'] != null) {
+        try {
+          final meta = user['metadata'] is String ? jsonDecode(user['metadata']) : user['metadata'];
+          companyName = meta['company_name'];
+        } catch (_) {}
+      }
+      displayName = companyName ?? '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'.trim();
+    } else {
+      displayName = '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'.trim();
+    }
 
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxDialogWidth, maxHeight: 600),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // User header with avatar
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Colors.blue[100],
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.blue[700],
-                          size: 30,
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (dialogContext) {
+        // Analytics state managed inside the dialog
+        Map<String, dynamic>? analytics;
+        bool isLoadingAnalytics = isDriver; // Start loading immediately for drivers
+        String analyticsError = '';
+
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            // Fetch analytics for drivers on first build
+            if (isDriver && analytics == null && isLoadingAnalytics && analyticsError.isEmpty) {
+              _fetchUserAnalytics(user['email']).then((data) {
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    analytics = data;
+                    isLoadingAnalytics = false;
+                  });
+                }
+              }).catchError((e) {
+                if (dialogContext.mounted) {
+                  setDialogState(() {
+                    analyticsError = e.toString().replaceAll('Exception: ', '');
+                    isLoadingAnalytics = false;
+                  });
+                }
+              });
+            }
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxDialogWidth, maxHeight: 600),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // User header with avatar
+                        Row(
                           children: [
-                            Text(
-                              '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[900],
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: isProvider ? Colors.orange[100] : Colors.blue[100],
+                              child: Icon(
+                                isProvider ? Icons.business : Icons.person,
+                                color: isProvider ? Colors.orange[700] : Colors.blue[700],
+                                size: 30,
                               ),
                             ),
-                            if (hasAnalytics)
-                              Container(
-                                margin: EdgeInsets.only(top: 4),
-                                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: user['behavior_score'] >= 80 ? Colors.green[100] : 
-                                        user['behavior_score'] >= 60 ? Colors.orange[100] : Colors.red[100],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'Score: ${user['behavior_score']?.toInt() ?? 0}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: user['behavior_score'] >= 80 ? Colors.green[800] : 
-                                          user['behavior_score'] >= 60 ? Colors.orange[800] : Colors.red[800],
+                            SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[900],
+                                    ),
                                   ),
-                                ),
+                                  if (analytics != null && analytics!['overall_behavior_score'] != null)
+                                    Container(
+                                      margin: EdgeInsets.only(top: 4),
+                                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (analytics!['overall_behavior_score'] as num) >= 80 ? Colors.green[100] :
+                                              (analytics!['overall_behavior_score'] as num) >= 60 ? Colors.orange[100] : Colors.red[100],
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Score: ${(analytics!['overall_behavior_score'] as num).toInt()}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: (analytics!['overall_behavior_score'] as num) >= 80 ? Colors.green[800] :
+                                                (analytics!['overall_behavior_score'] as num) >= 60 ? Colors.orange[800] : Colors.red[800],
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close),
+                              onPressed: () => Navigator.pop(dialogContext),
+                            ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Divider(),
-                  SizedBox(height: 8),
-                  
-                  // Basic user details
-                  _buildUserDetailRow('Email', user['email']),
-                  _buildUserDetailRow('Role', user['role']),
-                  _buildUserDetailRow('User ID', user['user_id']),
-                  
-                  // Driver-specific analytics if available
-                  if (hasAnalytics) ...[
-                    SizedBox(height: 16),
-                    Text(
-                      'Driver Analytics',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[900],
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    _buildUserDetailRow('Behavior Score', '${user['behavior_score']?.toInt() ?? 0}/100'),
-                    _buildUserDetailRow('Total Trips', user['total_trips']?.toString() ?? '0'),
-                    _buildUserDetailRow('Total Distance', '${user['total_distance']?.toStringAsFixed(1) ?? '0'} miles'),
-                    _buildUserDetailRow('Risk Level', user['risk_level'] ?? 'Unknown'),
-                    
-                    if (user['trips'] != null && user['trips'].isNotEmpty) ...[
-                      SizedBox(height: 16),
-                      Text(
-                        'Recent Trips',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[900],
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey[300]!),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ListView.builder(
-                          itemCount: (user['trips'] as List).take(5).length,
-                          itemBuilder: (context, index) {
-                            var trip = user['trips'][index];
-                            return ListTile(
-                              dense: true,
-                              title: Text('Trip ${index + 1}', style: TextStyle(fontSize: 13)),
-                              subtitle: Text(
-                                'Distance: ${trip['total_distance_miles']?.toStringAsFixed(1) ?? '0'} mi | Score: ${trip['behavior_score']?.toInt() ?? 0}',
-                                style: TextStyle(fontSize: 11),
+                        SizedBox(height: 16),
+                        Divider(),
+                        SizedBox(height: 8),
+
+                        // Basic user details
+                        _buildUserDetailRow('Email', user['email']),
+                        _buildUserDetailRow('Role', user['role']),
+                        _buildUserDetailRow('User ID', user['user_id']),
+                        if (user['created_at'] != null && user['created_at'].toString().isNotEmpty)
+                          _buildUserDetailRow('Joined', _formatRelativeTime(user['created_at'])),
+
+                        // Provider-specific metadata
+                        if (isProvider && user['metadata'] != null) ...[
+                          SizedBox(height: 16),
+                          Text('Company Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange[900])),
+                          SizedBox(height: 8),
+                          Builder(builder: (context) {
+                            try {
+                              final meta = user['metadata'] is String ? jsonDecode(user['metadata']) : user['metadata'];
+                              return Column(
+                                children: [
+                                  if (meta['state'] != null) _buildUserDetailRow('State', meta['state']),
+                                  if (meta['contact_person'] != null) _buildUserDetailRow('Contact', meta['contact_person']),
+                                  if (meta['contact_email'] != null) _buildUserDetailRow('Contact Email', meta['contact_email']),
+                                  if (meta['contact_phone'] != null) _buildUserDetailRow('Phone', meta['contact_phone']),
+                                  if (meta['license_number'] != null) _buildUserDetailRow('License #', meta['license_number']),
+                                ],
+                              );
+                            } catch (_) {
+                              return SizedBox.shrink();
+                            }
+                          }),
+                        ],
+
+                        // Driver analytics section
+                        if (isDriver) ...[
+                          SizedBox(height: 16),
+                          Text('Driver Analytics', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                          SizedBox(height: 8),
+                          if (isLoadingAnalytics)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: Center(child: Column(
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 8),
+                                  Text('Loading driver analytics...', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                                ],
+                              )),
+                            )
+                          else if (analyticsError.isNotEmpty)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                analytics == null ? 'No trips analyzed yet' : 'Error: $analyticsError',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
                               ),
-                              trailing: Text(
-                                trip['start_timestamp'] != null 
-                                  ? trip['start_timestamp'].toString().substring(0, 10)
-                                  : '',
-                                style: TextStyle(fontSize: 11),
+                            )
+                          else if (analytics != null) ...[
+                            _buildUserDetailRow('Behavior Score', '${(analytics!['overall_behavior_score'] as num?)?.toInt() ?? 0}/100'),
+                            _buildUserDetailRow('Total Trips', analytics!['total_trips']?.toString() ?? '0'),
+                            _buildUserDetailRow('Total Distance', '${(analytics!['total_distance_miles'] as num?)?.toStringAsFixed(1) ?? '0'} miles'),
+                            _buildUserDetailRow('Risk Level', analytics!['risk_level'] ?? 'Unknown'),
+                            _buildUserDetailRow('Avg Speed', '${(analytics!['overall_moving_avg_speed_mph'] as num?)?.toStringAsFixed(1) ?? '0'} mph'),
+                            _buildUserDetailRow('Harsh Events/100mi', analytics!['harsh_events_per_100_miles']?.toStringAsFixed(1) ?? '0'),
+
+                            if (analytics!['trips'] != null && (analytics!['trips'] as List).isNotEmpty) ...[
+                              SizedBox(height: 16),
+                              Text('Recent Trips', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue[900])),
+                              SizedBox(height: 8),
+                              Container(
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ListView.builder(
+                                  itemCount: (analytics!['trips'] as List).take(5).length,
+                                  itemBuilder: (context, index) {
+                                    var trip = (analytics!['trips'] as List)[index];
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text('Trip ${index + 1}', style: TextStyle(fontSize: 13)),
+                                      subtitle: Text(
+                                        'Distance: ${(trip['total_distance_miles'] as num?)?.toStringAsFixed(1) ?? '0'} mi | Score: ${(trip['behavior_score'] as num?)?.toInt() ?? 0}',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      trailing: Text(
+                                        trip['start_timestamp'] != null
+                                          ? trip['start_timestamp'].toString().substring(0, 10)
+                                          : '',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
-                            );
-                          },
+                            ],
+                          ],
+                        ],
+
+                        SizedBox(height: 20),
+                        // Close button
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            onPressed: () => Navigator.pop(dialogContext),
+                            icon: Icon(Icons.check),
+                            label: Text('Close'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.blue[800],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                  ],
-                  
-                  SizedBox(height: 20),
-                  // Close button
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: Icon(Icons.check),
-                      label: Text('Close'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.blue[800],
-                      ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
+  }
+
+  // Fetches analytics for a specific user by email from the analyze-driver endpoint
+  Future<Map<String, dynamic>> _fetchUserAnalytics(String email) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.server}/analyze-driver?email=$email'),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Failed to load analytics');
+    }
   }
 
   // Builds a user detail row for the details dialog
@@ -1608,7 +1642,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             // Search input
             TextField(
               decoration: InputDecoration(
-                labelText: 'Search by name, email or ID',
+                labelText: 'Search by email address',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: Icon(Icons.search),
@@ -1798,7 +1832,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             // Search input
             TextField(
               decoration: InputDecoration(
-                labelText: 'Search by policy number or insurance company',
+                labelText: 'Search by email address',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: Icon(Icons.search),
@@ -1852,6 +1886,18 @@ class _AdminHomePageState extends State<AdminHomePage> {
         separatorBuilder: (_, __) => SizedBox(height: 8),
         itemBuilder: (context, index) {
           final user = _insuranceResults[index];
+
+          // Get company name from metadata (preferred) or fall back to name fields
+          String companyName = '${user['first_name'] ?? ''} ${user['last_name'] ?? ''}'.trim();
+          if (user['metadata'] != null) {
+            try {
+              final meta = user['metadata'] is String ? jsonDecode(user['metadata']) : user['metadata'];
+              if (meta['company_name'] != null && meta['company_name'].toString().isNotEmpty) {
+                companyName = meta['company_name'];
+              }
+            } catch (_) {}
+          }
+
           return Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -1867,7 +1913,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 child: Icon(Icons.business, color: Colors.orange[800]),
               ),
               title: Text(
-                '${user['first_name']} ${user['last_name']}',
+                companyName,
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Column(
@@ -1879,8 +1925,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     style: TextStyle(color: Colors.grey[700]),
                   ),
                   Text(
-                    'Role: ${user['role'] ?? 'insurance'}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    'Insurance Provider',
+                    style: TextStyle(color: Colors.orange[700], fontSize: 12),
                   ),
                 ],
               ),
@@ -1896,6 +1942,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
   // Shows the analytics modal (platform-specific)
   void _showAnalytics() {
     final isWeb = kIsWeb;
+    // Refresh stats when opening analytics
+    _fetchQuickStats();
 
     if (isWeb) {
       showDialog(
@@ -1978,14 +2026,33 @@ class _AdminHomePageState extends State<AdminHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'User Statistics',
-                    style: TextStyle(
-                      fontSize: isLargeScreen ? 20 : 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'User Statistics',
+                        style: TextStyle(
+                          fontSize: isLargeScreen ? 20 : 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_isLoadingStats)
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                    ],
                   ),
                   SizedBox(height: 16),
+                  if (_statsError.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'Error loading stats: $_statsError',
+                        style: TextStyle(color: Colors.red, fontSize: 14),
+                      ),
+                    ),
                   Row(
                     children: [
                       Expanded(
@@ -2022,7 +2089,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
             ),
           ),
           SizedBox(height: isLargeScreen ? 24 : 16),
-          // Activity overview card
+          // Recent signup activity card
           Card(
             elevation: 2,
             child: Padding(
@@ -2031,33 +2098,65 @@ class _AdminHomePageState extends State<AdminHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Activity Overview',
+                    'Recent Signup Activity',
                     style: TextStyle(
                       fontSize: isLargeScreen ? 20 : 18,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   SizedBox(height: 16),
-                  Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.bar_chart, size: 48, color: Colors.blue),
-                          SizedBox(height: 16),
-                          Text(
-                            'Activity charts will appear here',
-                            style: TextStyle(fontSize: isLargeScreen ? 18 : 16),
+                  Builder(builder: (context) {
+                    final recentSignups = (_quickStats['recent_signups'] as List?)
+                        ?.cast<Map<String, dynamic>>() ?? [];
+                    if (recentSignups.isEmpty) {
+                      return Container(
+                        height: 100,
+                        child: Center(child: Text('No recent signups')),
+                      );
+                    }
+                    return Column(
+                      children: recentSignups.map((signup) {
+                        return ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 16,
+                            backgroundColor: signup['role'] == 'admin'
+                                ? Colors.green[100]
+                                : signup['role'] == 'provider'
+                                    ? Colors.orange[100]
+                                    : Colors.blue[100],
+                            child: Icon(
+                              signup['role'] == 'admin'
+                                  ? Icons.admin_panel_settings
+                                  : signup['role'] == 'provider'
+                                      ? Icons.business
+                                      : Icons.person,
+                              size: 16,
+                              color: signup['role'] == 'admin'
+                                  ? Colors.green[800]
+                                  : signup['role'] == 'provider'
+                                      ? Colors.orange[800]
+                                      : Colors.blue[800],
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
+                          title: Text(
+                            signup['name']?.isNotEmpty == true
+                                ? signup['name']
+                                : signup['email'] ?? '',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          subtitle: Text(
+                            '${signup['role'] ?? ''} - ${_formatRelativeTime(signup['created_at'])}',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          trailing: Text(
+                            signup['email'] ?? '',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -2079,19 +2178,10 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('access_token');
-
-      if (token == null) {
-        throw Exception('No authentication token found');
-      }
-
-      final response = await http.get(
-        Uri.parse('${AppConfig.server}/admin/stats'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+      final response = await http.post(
+        Uri.parse('${AppConfig.server}/auth-user'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'mode': 'admin_stats'}),
       );
 
       if (response.statusCode == 200) {
@@ -2101,6 +2191,8 @@ class _AdminHomePageState extends State<AdminHomePage> {
             'total_users': data['total_users'] ?? 0,
             'total_admins': data['total_admins'] ?? 0,
             'total_insurance': data['total_insurance'] ?? 0,
+            'recent_signups': data['recent_signups'] ?? [],
+            'role_breakdown': data['role_breakdown'] ?? {},
           };
         });
       } else {
@@ -2117,77 +2209,6 @@ class _AdminHomePageState extends State<AdminHomePage> {
     }
   }
 
-  // Fetches server information
-  Future<void> _fetchServerInfo() async {
-    setState(() {
-      _isLoadingServerInfo = true;
-      _serverInfoError = '';
-    });
-
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      String? token = prefs.getString('access_token');
-
-      if (token == null) {
-        throw Exception('No authentication token found');
-      }
-
-      final response = await http.get(
-        Uri.parse('${AppConfig.server}/server-info'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _serverInfo = jsonDecode(response.body);
-        });
-      } else {
-        //throw Exception('Failed to load server info: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        // _serverInfoError = 'Failed to load server info: $e';
-      });
-    } finally {
-      setState(() {
-        _isLoadingServerInfo = false;
-      });
-    }
-  }
-
-  // Searches for users based on query
-  // void _searchUsers([
-  //   void Function(VoidCallback fn)? modalSetState,
-  //   BuildContext? context,
-  // ]) async {
-  //   if (context != null) FocusScope.of(context).unfocus();
-  //   final setStateFn = modalSetState ?? setState;
-
-  //   setStateFn(() {
-  //     _isLoadingUsers = true;
-  //     _userSearchError = '';
-  //     _userResults = [];
-  //   });
-
-  //   try {
-  //     final results = await TripService.searchUsers(_userSearchQuery);
-  //     setStateFn(() {
-  //       _userResults = results;
-  //     });
-  //   } catch (e) {
-  //     setStateFn(() {
-  //       _userSearchError = e.toString();
-  //     });
-  //   } finally {
-  //     setStateFn(() {
-  //       _isLoadingUsers = false;
-  //     });
-  //   }
-  // }
-  //revert to above code if below fails:
   void _searchUsers([
     void Function(VoidCallback fn)? modalSetState,
     BuildContext? context,
@@ -2202,50 +2223,30 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      // Try to search using your analyze-driver endpoint
-      final response = await http.get(
-        Uri.parse('https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com/analyze-driver?email=${Uri.encodeComponent(_userSearchQuery.trim())}'),
+      final response = await http.post(
+        Uri.parse('${AppConfig.server}/auth-user'),
         headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'mode': 'search_users',
+          'query': _userSearchQuery.trim().toLowerCase(),
+        }),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        // Store full analytics for display
-        // Create user result for list display
+        final users = data['users'] as List? ?? [];
         setStateFn(() {
-          _userResults = [{
-            'email': data['user_email'] ?? _userSearchQuery,
-            'first_name': data['user_name']?.split(' ').first ?? 'Driver',
-            'last_name': data['user_name']?.split(' ').skip(1).join(' ') ?? '',
-            'user_id': data['user_id'],
-            'role': 'driver',
-            'behavior_score': data['overall_behavior_score'],
-            'total_trips': data['total_trips'],
-            'total_distance': data['total_distance_miles'],
-            'risk_level': data['risk_level'],
-            'trips': data['trips'] ?? []
-          }];
-        });
-      } else if (response.statusCode == 404) {
-        setStateFn(() {
-          _userSearchError = 'User not found';
+          _userResults = List<Map<String, dynamic>>.from(users);
         });
       } else {
-        throw Exception('Failed to search users');
+        final errorData = jsonDecode(response.body);
+        final errorMsg = errorData['error'] ?? 'Search failed';
+        throw Exception(errorMsg);
       }
     } catch (e) {
-      // Fallback to Ryan's search if your backend fails
-      try {
-        final results = await TripService.searchUsers(_userSearchQuery);
-        setStateFn(() {
-          _userResults = results;
-        });
-      } catch (fallbackError) {
-        setStateFn(() {
-          _userSearchError = 'Search failed: ${e.toString()}';
-        });
-      }
+      setStateFn(() {
+        _userSearchError = e.toString().replaceAll('Exception: ', '');
+      });
     } finally {
       setStateFn(() {
         _isLoadingUsers = false;
@@ -2269,13 +2270,30 @@ class _AdminHomePageState extends State<AdminHomePage> {
     });
 
     try {
-      final results = await TripService.searchUsers(_insuranceSearchQuery);
-      setStateFn(() {
-        _insuranceResults = results;
-      });
+      final response = await http.post(
+        Uri.parse('${AppConfig.server}/auth-user'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'mode': 'search_users',
+          'query': _insuranceSearchQuery.trim().toLowerCase(),
+          'role_filter': 'provider',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final users = data['users'] as List? ?? [];
+        setStateFn(() {
+          _insuranceResults = List<Map<String, dynamic>>.from(users);
+        });
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMsg = errorData['error'] ?? 'Search failed';
+        throw Exception(errorMsg);
+      }
     } catch (e) {
       setStateFn(() {
-        _insuranceSearchError = e.toString();
+        _insuranceSearchError = 'Search failed: ${e.toString()}';
       });
     } finally {
       setStateFn(() {
@@ -2368,35 +2386,40 @@ class _AdminHomePageState extends State<AdminHomePage> {
         'password': _passwordController.text,
       };
 
-      // Add role-specific fields based on _selectedRole
+      // ✅ Add role-specific fields based on _selectedRole
       if (_selectedRole == 'user') {
         // Creating a driver account
         requestBody['role'] = 'driver';
         requestBody['name'] = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
-        requestBody['zipcode'] = _adminIdController.text.trim(); // Using adminIdController for zipcode
-        
+        requestBody['zipcode'] = _zipcodeController.text.trim();  // ✅ Use dedicated zipcode controller
+
         // Add base_point from geocoding
         if (_basePointAdmin != null) {
           requestBody['base_point'] = _basePointAdmin!.toJson();
           print('📍 Admin: Including base_point: ${_basePointAdmin!.city}, ${_basePointAdmin!.state}');
         }
       } else if (_selectedRole == 'insurance') {
-        // Creating an insurance provider account
+        // ✅ Creating an insurance provider account with complete info
         requestBody['role'] = 'provider';
-        requestBody['name'] = _firstNameController.text.trim(); // Company name
+        requestBody['name'] = _companyNameController.text.trim();  // Company name
         requestBody['metadata'] = jsonEncode({
           'original_role': 'insurance',
-          'state': _lastNameController.text.trim(),
-          'company_name': _firstNameController.text.trim()
+          'company_name': _companyNameController.text.trim(),
+          'state': _stateController.text.trim(),
+          'contact_person': _contactPersonController.text.trim(),
+          'contact_email': _contactEmailController.text.trim(),
+          'contact_phone': _contactPhoneController.text.trim(),
+          'license_number': _licenseNumberController.text.trim()
         });
       } else if (_selectedRole == 'admin') {
-        // Creating another admin account
-        requestBody['role'] = 'provider';
+        // ✅ Creating another admin account with proper 'admin' role
+        requestBody['role'] = 'admin';  // ✅ Use 'admin' role directly!
         requestBody['name'] = '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}';
         requestBody['metadata'] = jsonEncode({
-          'original_role': 'admin',
           'admin_id': _adminIdController.text.trim(),
-          'server_number': _serverNumberController.text.trim()
+          'server_number': _serverNumberController.text.trim(),
+          'permissions': 'standard',  // Not super admin
+          'first_login': true  // Prompt password change
         });
       }
 
@@ -2411,63 +2434,82 @@ class _AdminHomePageState extends State<AdminHomePage> {
 
       if (response.statusCode == 200) {
         // Success
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Account created successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _clearCreateAccountForm();
-        
-        // Refresh stats if needed
-        _fetchQuickStats();
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Account created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          _clearCreateAccountForm();
+
+          // Refresh stats if needed
+          _fetchQuickStats();
+        }
       } else {
         final errorBody = jsonDecode(response.body);
         throw Exception(errorBody['error'] ?? 'Failed to create account');
       }
     } catch (e) {
-      setState(() {
-        _createAccountError = e.toString().replaceAll('Exception: ', '');
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          _createAccountError = e.toString().replaceAll('Exception: ', '');
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isCreatingAccount = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isCreatingAccount = false;
+        });
+      }
     }
   }
 
   // Clears the account creation form
   void _clearCreateAccountForm() {
+    // Clear common fields
     _emailController.clear();
     _passwordController.clear();
+
+    // Clear driver fields
     _firstNameController.clear();
     _lastNameController.clear();
+    _zipcodeController.clear();
+
+    // Clear admin fields
+    _adminIdController.clear();
+    _serverNumberController.clear();
+
+    // Clear ISP fields
+    _companyNameController.clear();
+    _stateController.clear();
+    _contactPersonController.clear();
+    _contactEmailController.clear();
+    _contactPhoneController.clear();
+    _licenseNumberController.clear();
+
+    // Reset state
     setState(() {
       _selectedRole = 'user';
+      _basePointAdmin = null;
+      _zipcodeValidAdmin = null;
+      _createAccountError = '';
     });
-  }
-
-  // Checks if the server is online
-  Future<bool> _checkServerStatus() async {
-    try {
-      final response = await http.get(Uri.parse('${AppConfig.server}/ping'));
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
   }
 
   // Logs out the current admin user
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
-    Navigator.pushReplacementNamed(context, '/login');
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 }

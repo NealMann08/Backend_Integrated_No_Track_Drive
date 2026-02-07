@@ -190,11 +190,13 @@ final _serverNumberController = TextEditingController();
 
   Future<void> _signup() async {
     final url = authEndpoint; // Use your Lambda endpoint
-    
+
     // Map Flutter roles to your backend roles
     String backendRole = 'driver'; // Default
-    if (_selectedRole == 'insurance' || _selectedRole == 'admin') {
+    if (_selectedRole == 'insurance') {
       backendRole = 'provider';
+    } else if (_selectedRole == 'admin') {
+      backendRole = 'admin';  // ✅ Admin gets its own role, not 'provider'
     }
     
     // Build data structure matching your backend
@@ -459,68 +461,18 @@ final _serverNumberController = TextEditingController();
       // print('Final navigation role: $navigationRole');
       // final role = navigationRole;
       // revert to above if below causes issues
-      // Determine the correct role for navigation
+      // ✅ SIMPLIFIED: Determine navigation role directly from backend role
       String navigationRole = 'user'; // Default
 
-      // For LOGIN, we need to detect role from backend response
-      if (!_isSignupMode) {
-        // During login, detect role from backend data
-        if (userData['role'] == 'provider') {
-          // Check metadata to determine if insurance or admin
-          if (userData['metadata'] != null) {
-            try {
-              Map<String, dynamic> metadata;
-              if (userData['metadata'] is String) {
-                metadata = json.decode(userData['metadata']);
-              } else if (userData['metadata'] is Map) {
-                metadata = userData['metadata'] as Map<String, dynamic>;
-              } else {
-                metadata = {};
-              }
-              
-              if (metadata['original_role'] == 'admin') {
-                navigationRole = 'admin';
-              } else if (metadata['original_role'] == 'insurance') {
-                navigationRole = 'insurance';
-              } else {
-                navigationRole = 'insurance'; // Default provider to insurance
-              }
-            } catch (e) {
-              print('Error parsing metadata during login: $e');
-              navigationRole = 'insurance';
-            }
-          } else {
-            navigationRole = 'insurance'; // Provider without metadata = insurance
-          }
-        } else if (userData['role'] == 'driver') {
-          navigationRole = 'user';
-        }
-      } else {
-        // For SIGNUP, use the selected role with metadata check
-        navigationRole = _selectedRole;
-        if (userData['role'] == 'provider' && userData['metadata'] != null) {
-          try {
-            Map<String, dynamic> metadata;
-            if (userData['metadata'] is String) {
-              metadata = json.decode(userData['metadata']);
-            } else if (userData['metadata'] is Map) {
-              metadata = userData['metadata'] as Map<String, dynamic>;
-            } else {
-              metadata = {};
-            }
-            
-            if (metadata['original_role'] == 'admin') {
-              navigationRole = 'admin';
-            } else if (metadata['original_role'] == 'insurance') {
-              navigationRole = 'insurance';
-            }
-          } catch (e) {
-            print('Error parsing metadata during signup: $e');
-          }
-        }
+      if (userData['role'] == 'driver') {
+        navigationRole = 'user';
+      } else if (userData['role'] == 'provider') {
+        navigationRole = 'insurance';
+      } else if (userData['role'] == 'admin') {
+        navigationRole = 'admin';  // ✅ Direct admin detection, no metadata parsing needed!
       }
 
-      print('Login mode: ${!_isSignupMode}, Backend role: ${userData['role']}, Final navigation role: $navigationRole');
+      print('Backend role: ${userData['role']}, Navigation role: $navigationRole');
       final role = navigationRole;
     
     if (mounted) {
@@ -637,59 +589,59 @@ final _serverNumberController = TextEditingController();
   }
 
   Widget _buildISPNote(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Color(0xFF1976D2).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF1976D2).withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.business,
-            color: Color(0xFF1976D2),
-            size: 24,
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Are you an Insurance Service Provider?',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1976D2),
-                    fontSize: 14,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => ISPRegistrationPage()),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Color(0xFF1976D2).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Color(0xFF1976D2).withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.business,
+              color: Color(0xFF1976D2),
+              size: 24,
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Are you an Insurance Service Provider?',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1976D2),
+                      fontSize: 14,
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ISPRegistrationPage()),
-                    );
-                  },
-                  child: Text(
-                    'Click here to learn how to register',
+                  SizedBox(height: 4),
+                  Text(
+                    'Tap here to learn how to register',
                     style: TextStyle(
                       color: Color(0xFF1976D2),
                       fontSize: 13,
                       decoration: TextDecoration.underline,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.arrow_forward_ios,
-            color: Color(0xFF1976D2),
-            size: 16,
-          ),
-        ],
+            Icon(
+              Icons.arrow_forward_ios,
+              color: Color(0xFF1976D2),
+              size: 16,
+            ),
+          ],
+        ),
       ),
     );
   }

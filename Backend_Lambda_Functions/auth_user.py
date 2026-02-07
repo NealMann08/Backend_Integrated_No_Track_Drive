@@ -395,9 +395,9 @@ def handle_signup(body):
             return create_error_response(400, password_error)
         
         # Validate role
-        if role not in ['driver', 'provider']:
+        if role not in ['driver', 'provider', 'admin']:
             print(f"❌ Invalid role: {role}")
-            return create_error_response(400, 'Role must be either "driver" or "provider"')
+            return create_error_response(400, 'Role must be either "driver", "provider", or "admin"')
         
         # Check if email already exists (early check to prevent processing)
         if check_email_exists(email):
@@ -453,12 +453,64 @@ def handle_signup(body):
             # Driver-specific metadata
             user_data['anonymization_enabled'] = bool(validated_base_point)
             user_data['privacy_level'] = validated_privacy.get('consentLevel', 'full') if validated_privacy else 'full'
-        
+
+        # Add admin-specific fields
+        elif role == 'admin':
+            print("👑 Processing admin-specific data")
+
+            # Extract admin-specific fields from metadata
+            metadata = body.get('metadata')
+            if metadata:
+                try:
+                    # If metadata is a JSON string, parse it
+                    if isinstance(metadata, str):
+                        import json
+                        admin_metadata = json.loads(metadata)
+                    else:
+                        admin_metadata = metadata
+
+                    # Store admin metadata
+                    user_data['metadata'] = admin_metadata
+                    print(f"📎 Admin metadata: {admin_metadata.get('admin_id', 'N/A')}")
+
+                    # Set first_login flag for password change prompt
+                    if 'first_login' not in admin_metadata:
+                        admin_metadata['first_login'] = True
+                        user_data['metadata'] = admin_metadata
+
+                except Exception as e:
+                    print(f"⚠️ Error parsing admin metadata: {e}")
+                    user_data['metadata'] = {'first_login': True}
+            else:
+                # Default metadata for admin if none provided
+                user_data['metadata'] = {'first_login': True}
+
+        # Add provider-specific fields
+        elif role == 'provider':
+            print("🏢 Processing provider (ISP) specific data")
+
+            # Store provider metadata if provided
+            metadata = body.get('metadata')
+            if metadata:
+                try:
+                    if isinstance(metadata, str):
+                        import json
+                        provider_metadata = json.loads(metadata)
+                    else:
+                        provider_metadata = metadata
+
+                    user_data['metadata'] = provider_metadata
+                    print(f"📎 Provider metadata: {provider_metadata.get('state', 'N/A')}")
+                except Exception as e:
+                    print(f"⚠️ Error parsing provider metadata: {e}")
+
         # (remove if not working asap) Store any additional metadata from Flutter app
-        metadata = body.get('metadata')
-        if metadata and isinstance(metadata, dict):
-            user_data['metadata'] = metadata
-            print(f"📎 Storing additional metadata: {list(metadata.keys())}")
+        # This is now handled above per role, but keeping for backward compatibility
+        if 'metadata' not in user_data:
+            metadata = body.get('metadata')
+            if metadata and isinstance(metadata, dict):
+                user_data['metadata'] = metadata
+                print(f"📎 Storing additional metadata: {list(metadata.keys())}")
 
         # Store user in database
         print("💾 Storing user in database")
@@ -557,6 +609,99 @@ def handle_signin(body):
         traceback.print_exc()
         return create_error_response(500, 'Login failed')
 
+def handle_change_password(body):
+    """
+    Handle password change with current password verification
+    """
+    try:
+        print("🔐 CHANGE PASSWORD: Starting password change")
+
+        # Extract required fields
+        email = body.get('email', '').strip().lower()
+        current_password = body.get('current_password', '')
+        new_password = body.get('new_password', '')
+
+        print(f"📧 Password change request for: {email}")
+
+        # Validate required fields
+        if not email or not current_password or not new_password:
+            print("❌ Missing required fields")
+            return create_error_response(400, 'Email, current password, and new password are required')
+
+        # Validate email format
+        email_valid, email_error = validate_email(email)
+        if not email_valid:
+            print(f"❌ Invalid email: {email_error}")
+            return create_error_response(400, email_error)
+
+        # Validate new password strength
+        password_valid, password_error = validate_password(new_password)
+        if not password_valid:
+            print(f"❌ New password invalid: {password_error}")
+            return create_error_response(400, password_error)
+
+        # Check that new password is different from current
+        if current_password == new_password:
+            print("❌ New password same as current")
+            return create_error_response(400, 'New password must be different from current password')
+
+        # Find user by email
+        print("🔍 Looking up user by email")
+        response = users_table.scan(
+            FilterExpression='email = :email',
+            ExpressionAttributeValues={':email': email}
+        )
+
+        if not response['Items']:
+            print(f"❌ User not found: {email}")
+            return create_error_response(404, 'User not found')
+
+        user_data = response['Items'][0]
+        user_id = user_data['user_id']
+        print(f"✅ User found: {email}")
+
+        # Check account status
+        if user_data.get('account_status') != 'active':
+            print(f"❌ Account inactive: {email}")
+            return create_error_response(401, 'Account is inactive')
+
+        # Verify current password
+        stored_hash = user_data.get('password_hash')
+        if not stored_hash or not verify_password(current_password, stored_hash):
+            print(f"❌ Current password incorrect: {email}")
+            return create_error_response(401, 'Current password is incorrect')
+
+        print("🔒 Current password verified")
+
+        # Hash new password
+        new_hashed_password = hash_password(new_password)
+        if not new_hashed_password:
+            print("❌ Failed to hash new password")
+            return create_error_response(500, 'Failed to secure new password')
+
+        # Update password in database
+        print("💾 Updating password in database")
+        users_table.update_item(
+            Key={'user_id': user_id},
+            UpdateExpression='SET password_hash = :pwd, password_updated_at = :timestamp',
+            ExpressionAttributeValues={
+                ':pwd': new_hashed_password,
+                ':timestamp': datetime.utcnow().isoformat()
+            }
+        )
+
+        print(f"✅ Password changed successfully for: {email}")
+
+        return create_success_response({
+            'message': 'Password changed successfully'
+        })
+
+    except Exception as e:
+        print(f"❌ Change password error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return create_error_response(500, 'Password change failed')
+
 def handle_delete_account(body):
     """
     ENHANCED: Handle complete account deletion with full data cleanup
@@ -641,10 +786,148 @@ def handle_delete_account(body):
         traceback.print_exc()
         return create_error_response(500, 'Account deletion failed')
 
+def handle_admin_stats(body):
+    """Return user counts by role and recent signups for admin dashboard"""
+    try:
+        print("📊 ADMIN_STATS: Fetching user statistics")
+
+        response = users_table.scan(
+            ProjectionExpression='user_id, email, #n, #r, created_at',
+            ExpressionAttributeNames={'#n': 'name', '#r': 'role'}
+        )
+
+        items = response['Items']
+        # Handle pagination
+        while 'LastEvaluatedKey' in response:
+            response = users_table.scan(
+                ProjectionExpression='user_id, email, #n, #r, created_at',
+                ExpressionAttributeNames={'#n': 'name', '#r': 'role'},
+                ExclusiveStartKey=response['LastEvaluatedKey']
+            )
+            items.extend(response['Items'])
+
+        # Count by role
+        drivers = [u for u in items if u.get('role') == 'driver']
+        admins = [u for u in items if u.get('role') == 'admin']
+        providers = [u for u in items if u.get('role') == 'provider']
+
+        # Get recent signups sorted by created_at (most recent first)
+        sorted_users = sorted(items, key=lambda u: u.get('created_at', ''), reverse=True)
+        recent_signups = []
+        for u in sorted_users[:10]:
+            recent_signups.append({
+                'email': u.get('email', ''),
+                'name': u.get('name', ''),
+                'role': u.get('role', ''),
+                'created_at': u.get('created_at', '')
+            })
+
+        stats = {
+            'total_users': len(drivers),
+            'total_admins': len(admins),
+            'total_insurance': len(providers),
+            'total_all': len(items),
+            'role_breakdown': {
+                'drivers': len(drivers),
+                'admins': len(admins),
+                'providers': len(providers)
+            },
+            'recent_signups': recent_signups
+        }
+
+        print(f"✅ Stats: {len(drivers)} drivers, {len(admins)} admins, {len(providers)} providers")
+        return create_success_response(convert_decimal_to_float(stats))
+
+    except Exception as e:
+        print(f"❌ Admin stats error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return create_error_response(500, 'Failed to fetch admin stats')
+
+def handle_health_check(body):
+    """Quick DynamoDB connectivity test for server status"""
+    try:
+        print("🏥 HEALTH_CHECK: Testing DynamoDB connectivity")
+        # Quick read to verify DynamoDB is reachable
+        users_table.scan(Limit=1, ProjectionExpression='user_id')
+        print("✅ Health check passed")
+        return create_success_response({'status': 'healthy'})
+    except Exception as e:
+        print(f"❌ Health check failed: {str(e)}")
+        return create_error_response(500, 'Health check failed')
+
+def handle_search_users(body):
+    """Search users by email with optional role filter"""
+    try:
+        query = body.get('query', '').strip().lower()
+        role_filter = body.get('role_filter', '')
+
+        print(f"🔍 SEARCH_USERS: query='{query}', role_filter='{role_filter}'")
+
+        if not query:
+            return create_error_response(400, 'Search query is required')
+
+        # Build filter expression
+        filter_expr = 'contains(email, :query)'
+        expr_values = {':query': query}
+
+        if role_filter:
+            filter_expr += ' AND #r = :role'
+            expr_values[':role'] = role_filter
+
+        scan_kwargs = {
+            'FilterExpression': filter_expr,
+            'ExpressionAttributeValues': expr_values,
+            'ProjectionExpression': 'user_id, email, #n, #r, created_at, account_status, metadata'
+        }
+
+        # Add ExpressionAttributeNames (role and name are reserved words)
+        expr_names = {'#n': 'name', '#r': 'role'}
+        scan_kwargs['ExpressionAttributeNames'] = expr_names
+
+        response = users_table.scan(**scan_kwargs)
+        items = response['Items']
+
+        # Handle pagination
+        while 'LastEvaluatedKey' in response:
+            scan_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
+            response = users_table.scan(**scan_kwargs)
+            items.extend(response['Items'])
+
+        # Format results
+        users = []
+        for u in items:
+            name_parts = (u.get('name', '') or '').split(' ', 1)
+            user_entry = {
+                'user_id': u.get('user_id', ''),
+                'email': u.get('email', ''),
+                'first_name': name_parts[0] if name_parts else '',
+                'last_name': name_parts[1] if len(name_parts) > 1 else '',
+                'role': u.get('role', ''),
+                'created_at': u.get('created_at', ''),
+                'account_status': u.get('account_status', ''),
+            }
+            # Include metadata for providers
+            if u.get('metadata'):
+                user_entry['metadata'] = u['metadata']
+            users.append(user_entry)
+
+        print(f"✅ Found {len(users)} users matching query")
+        return create_success_response({
+            'users': convert_decimal_to_float(users),
+            'count': len(users)
+        })
+
+    except Exception as e:
+        print(f"❌ Search users error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return create_error_response(500, 'Search failed')
+
 def lambda_handler(event, context):
     """
     ENHANCED Lambda handler for email/password authentication with complete data deletion
-    Supports: signup, signin, delete_account
+    Supports: signup, signin, change_password, delete_account
     """
     try:
         print(f"🚀 Enhanced Auth Lambda invoked: {event.get('httpMethod', 'Unknown')} {event.get('path', 'Unknown')}")
@@ -676,18 +959,26 @@ def lambda_handler(event, context):
         
         if not mode:
             print("❌ Missing mode")
-            return create_error_response(400, 'Mode is required (signup, signin, or delete_account)')
+            return create_error_response(400, 'Mode is required (signup, signin, change_password, or delete_account)')
         
         # Route to appropriate handler
         if mode == 'signup':
             return handle_signup(body)
         elif mode == 'signin':
             return handle_signin(body)
+        elif mode == 'change_password':
+            return handle_change_password(body)
         elif mode == 'delete_account':
             return handle_delete_account(body)
+        elif mode == 'admin_stats':
+            return handle_admin_stats(body)
+        elif mode == 'health_check':
+            return handle_health_check(body)
+        elif mode == 'search_users':
+            return handle_search_users(body)
         else:
             print(f"❌ Invalid mode: {mode}")
-            return create_error_response(400, 'Invalid mode. Must be signup, signin, or delete_account')
+            return create_error_response(400, 'Invalid mode. Must be signup, signin, change_password, delete_account, admin_stats, health_check, or search_users')
     
     except Exception as e:
         print(f"❌ Lambda handler error: {str(e)}")

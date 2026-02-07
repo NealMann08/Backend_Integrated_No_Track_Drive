@@ -10,6 +10,9 @@ class AppConfig {
   // AWS API Gateway endpoint for all backend services
   static String server = 'https://m9yn8bsm3k.execute-api.us-west-1.amazonaws.com';
 
+  // Admin support email for user inquiries
+  static String adminEmail = 'admin@notrackdrive.com';
+
   // Allows changing the server at runtime if needed (useful for testing)
   static void setServer(String newServer) {
     server = newServer;

@@ -224,7 +224,7 @@ The Lambda functions are located in `Backend_Lambda_Functions/`. Each function i
 
 ### Acknowledgments
 
-This project was developed independently with the aid of AI-assisted development tools. Specifically, [Claude](https://www.anthropic.com/claude) (Anthropic, 2024) was used as a coding assistant for debugging, code review, and clarifying technical questions during development. All architectural decisions, core logic implementation, and project design are my own work.
+This project was developed independently with the aid of AI-assisted development tools. Specifically, [Claude](https://www.anthropic.com/claude) (Anthropic, 2025) was used as a coding assistant for debugging, code review, and clarifying technical questions during development. All architectural decisions, core logic implementation, and project design are my own work.
 
 **AI Tools Used:**
 - Claude (via Claude Code CLI) - Used for debugging assistance, answering technical questions about Flutter/Dart syntax, and code cleanup/refactoring suggestions

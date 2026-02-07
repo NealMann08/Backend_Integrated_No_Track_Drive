@@ -4,6 +4,7 @@ import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart' show SharedPreferences;
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'custom_app_bar.dart';
 import 'current_trip_page.dart';
 import 'graph_Score_Page.dart';
@@ -12,10 +13,9 @@ import 'ipconfig.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
+import 'pdf_helper.dart';
+import 'email_helper.dart';
 
 import 'data_manager.dart'; // Add this import
 
@@ -566,24 +566,11 @@ void _showFullReportModal(BuildContext context) {
                   ],
                 ),
                 SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildStatCard(
-                      icon: Icons.speed,
-                      label: 'Total Distance',
-                      value: '${totalDistanceMiles.toStringAsFixed(1)} mi',
-                      color: Colors.green,
-                    ),
-                    SizedBox(width: 12),
-                    _buildStatCard(
-                      icon: Icons.trending_up,
-                      label: 'Avg Score',
-                      value: scores.isNotEmpty
-                          ? '${(scores.reduce((a, b) => a + b) / scores.length).toStringAsFixed(0)}'
-                          : 'N/A',
-                      color: Colors.purple,
-                    ),
-                  ],
+                _buildStatCard(
+                  icon: Icons.speed,
+                  label: 'Total Distance',
+                  value: '${totalDistanceMiles.toStringAsFixed(1)} mi',
+                  color: Colors.green,
                 ),
                 const SizedBox(height: 24),
 
@@ -658,14 +645,38 @@ void _showFullReportModal(BuildContext context) {
                   ),
                   SizedBox(height: 12),
                   Container(
-                    height: 150,
-                    padding: EdgeInsets.all(12),
+                    height: 180,
+                    padding: EdgeInsets.fromLTRB(8, 12, 12, 8),
                     decoration: BoxDecoration(
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey[200]!),
                     ),
-                    child: _buildScoreTrajectory(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Graph legend
+                        Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Score per trip (T1 = oldest, T${scores.take(10).length} = newest)',
+                              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Expanded(child: _buildScoreTrajectory()),
+                      ],
+                    ),
                   ),
                   SizedBox(height: 8),
                   _buildTrendIndicator(),
@@ -944,35 +955,130 @@ Widget _buildTrendIndicator() {
 Future<void> _generateAndSharePDF(BuildContext context) async {
   try {
     final pdf = pw.Document();
+    final now = DateTime.now();
+    final driverName = userName.isNotEmpty ? userName : 'Driver';
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
+        margin: pw.EdgeInsets.all(40),
+        build: (pw.Context pdfContext) {
           return [
-            pw.Header(
-              level: 0,
-              child: pw.Text('Driving Safety Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            // Header
+            pw.Container(
+              padding: pw.EdgeInsets.all(20),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue800,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Text('NOTRACKDRIVE', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Driving Safety Report', style: pw.TextStyle(fontSize: 14, color: PdfColors.white)),
+                ],
+              ),
             ),
-            pw.Paragraph(text: 'Driver: ${userName.isNotEmpty ? userName : "N/A"}'),
-            pw.Paragraph(text: 'Generated: ${DateFormat('MMM d, yyyy').format(DateTime.now())}'),
-            pw.Divider(),
             pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Overall Score: $score')),
-            pw.Paragraph(text: _getScoreLabel(score)),
+
+            // Driver info and date
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Driver: $driverName', style: pw.TextStyle(fontSize: 12)),
+                pw.Text('Generated: ${DateFormat('MMMM d, yyyy h:mm a').format(now)}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              ],
+            ),
             pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Summary Statistics')),
-            pw.Bullet(text: 'Total Trips: $totalTrips'),
-            pw.Bullet(text: 'Total Distance: ${totalDistanceMiles.toStringAsFixed(1)} miles'),
-            pw.Bullet(text: 'Total Duration: ${_formatDuration(totalDurationMinutes)}'),
-            pw.Bullet(text: 'Average Score: ${scores.isNotEmpty ? (scores.reduce((a, b) => a + b) / scores.length).toStringAsFixed(0) : "N/A"}'),
-            pw.SizedBox(height: 20),
-            pw.Header(level: 1, child: pw.Text('Driving Habits Breakdown')),
-            ...breakdown.entries.map((e) => pw.Bullet(text: '${e.key}: ${e.value}')),
-            pw.SizedBox(height: 20),
+
+            // Overall Score Box
+            pw.Container(
+              padding: pw.EdgeInsets.all(20),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.blue, width: 2),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Text('OVERALL SAFETY SCORE', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                      pw.SizedBox(height: 8),
+                      pw.Text('$score', style: pw.TextStyle(fontSize: 48, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.Text('out of 100', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+                      pw.SizedBox(height: 8),
+                      pw.Container(
+                        padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: score >= 80 ? PdfColors.green100 : score >= 60 ? PdfColors.orange100 : PdfColors.red100,
+                          borderRadius: pw.BorderRadius.circular(12),
+                        ),
+                        child: pw.Text(_getScoreLabel(score), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 24),
+
+            // Summary Statistics Section
+            pw.Text('Summary Statistics', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Divider(color: PdfColors.blue200),
+            pw.SizedBox(height: 8),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: [
+                _buildPdfStatBox('Total Trips', '$totalTrips'),
+                _buildPdfStatBox('Distance', '${totalDistanceMiles.toStringAsFixed(1)} mi'),
+                _buildPdfStatBox('Duration', _formatDuration(totalDurationMinutes)),
+              ],
+            ),
+            pw.SizedBox(height: 24),
+
+            // Driving Habits Section
+            pw.Text('Driving Habits Analysis', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Divider(color: PdfColors.blue200),
+            pw.SizedBox(height: 8),
+            ...breakdown.entries.map((e) => pw.Container(
+              margin: pw.EdgeInsets.only(bottom: 6),
+              padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(e.key, style: pw.TextStyle(fontSize: 11)),
+                  pw.Text(e.value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            )),
+            pw.SizedBox(height: 24),
+
+            // Score Trajectory Graph
+            if (scores.isNotEmpty) ...[
+              pw.Text('Score Trajectory', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Divider(color: PdfColors.blue200),
+              pw.SizedBox(height: 8),
+              _buildPdfScoreChart(scores.take(10).toList().reversed.toList(), pdf),
+              pw.SizedBox(height: 8),
+              pw.Text(_getEmailTrendMessage(), style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic)),
+              pw.SizedBox(height: 24),
+            ],
+
+            // Recent Trips Table
             if (tripHistory.isNotEmpty) ...[
-              pw.Header(level: 1, child: pw.Text('Recent Trip Scores')),
-              pw.Table.fromTextArray(
+              pw.Text('Recent Trips', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Divider(color: PdfColors.blue200),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
+                cellStyle: pw.TextStyle(fontSize: 10),
+                cellPadding: pw.EdgeInsets.all(6),
                 headers: ['Date', 'Distance', 'Duration', 'Score'],
                 data: tripHistory.take(10).map((trip) {
                   String dateStr = trip['date'] ?? '';
@@ -981,7 +1087,7 @@ Future<void> _generateAndSharePDF(BuildContext context) async {
                     try {
                       DateTime date = DateTime.parse(dateStr).toLocal();
                       formattedDate = DateFormat('MMM d, yyyy').format(date);
-                    } catch (e) {}
+                    } catch (_) {}
                   }
                   return [
                     formattedDate,
@@ -992,29 +1098,182 @@ Future<void> _generateAndSharePDF(BuildContext context) async {
                 }).toList(),
               ),
             ],
-            pw.SizedBox(height: 30),
-            pw.Paragraph(
-              text: 'This report was generated by DriveGuard. For questions, contact support.',
-              style: pw.TextStyle(fontSize: 10, color: PdfColors.grey),
+            pw.SizedBox(height: 40),
+
+            // Footer
+            pw.Container(
+              padding: pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Text('This report was generated by NoTrackDrive', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                  pw.Text('For questions, contact support@notrackdrive.com', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                ],
+              ),
             ),
           ];
         },
       ),
     );
 
-    final output = await getTemporaryDirectory();
-    final file = File('${output.path}/driving_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf');
-    await file.writeAsBytes(await pdf.save());
+    final pdfBytes = await pdf.save();
+    // Filename format: NoTrackDrive_DriverName_Date_Time.pdf
+    final safeDriverName = driverName.replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(' ', '_');
+    final fileName = 'NoTrackDrive_${safeDriverName}_${DateFormat('yyyy-MM-dd_HHmm').format(now)}.pdf';
 
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'My Driving Safety Report',
-    );
+    // Use cross-platform PDF helper (works on both web and mobile)
+    final success = await savePdfFile(pdfBytes, fileName);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(kIsWeb ? 'PDF downloaded successfully!' : 'PDF ready to share!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save PDF. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   } catch (e) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Error generating PDF: $e')),
     );
   }
+}
+
+// Build a visual line chart for PDF
+pw.Widget _buildPdfScoreChart(List<double> scoreData, pw.Document pdfDoc) {
+  if (scoreData.isEmpty) {
+    return pw.Text('No data available', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500));
+  }
+
+  const double chartWidth = 450;
+  const double chartHeight = 120;
+  const double leftMargin = 30;
+  const double bottomMargin = 20;
+  const double topMargin = 15;
+
+  // Create fonts from the PDF document (must be done outside the painter closure)
+  final helveticaFont = PdfFont.helvetica(pdfDoc.document);
+  final helveticaBoldFont = PdfFont.helveticaBold(pdfDoc.document);
+
+  return pw.Container(
+    height: chartHeight + bottomMargin + topMargin,
+    width: chartWidth + leftMargin,
+    child: pw.CustomPaint(
+      size: PdfPoint(chartWidth + leftMargin, chartHeight + bottomMargin + topMargin),
+      painter: (PdfGraphics canvas, PdfPoint size) {
+        final double graphWidth = chartWidth - 10;
+        final double graphHeight = chartHeight;
+
+        // Draw Y-axis labels and grid lines
+        for (int i = 0; i <= 4; i++) {
+          final double y = topMargin + graphHeight - (i * graphHeight / 4);
+          final int label = i * 25;
+
+          // Grid line
+          canvas
+            ..setColor(PdfColors.grey300)
+            ..drawLine(leftMargin, y, leftMargin + graphWidth, y)
+            ..strokePath();
+
+          // Y-axis label
+          canvas
+            ..setColor(PdfColors.grey700)
+            ..drawString(
+              helveticaFont,
+              8,
+              '$label',
+              leftMargin - 22,
+              y - 3,
+            );
+        }
+
+        // Draw the line chart
+        if (scoreData.length > 1) {
+          final double xStep = graphWidth / (scoreData.length - 1);
+
+          // Draw line
+          canvas.setColor(PdfColors.blue);
+          for (int i = 0; i < scoreData.length - 1; i++) {
+            final double x1 = leftMargin + i * xStep;
+            final double y1 = topMargin + graphHeight - (scoreData[i].clamp(0, 100) / 100 * graphHeight);
+            final double x2 = leftMargin + (i + 1) * xStep;
+            final double y2 = topMargin + graphHeight - (scoreData[i + 1].clamp(0, 100) / 100 * graphHeight);
+
+            canvas
+              ..setLineWidth(2)
+              ..drawLine(x1, y1, x2, y2)
+              ..strokePath();
+          }
+
+          // Draw data points and labels
+          for (int i = 0; i < scoreData.length; i++) {
+            final double x = leftMargin + i * xStep;
+            final double y = topMargin + graphHeight - (scoreData[i].clamp(0, 100) / 100 * graphHeight);
+
+            // Point
+            canvas
+              ..setColor(PdfColors.blue800)
+              ..drawEllipse(x, y, 4, 4)
+              ..fillPath();
+
+            // Score label above point
+            canvas
+              ..setColor(PdfColors.blue900)
+              ..drawString(
+                helveticaBoldFont,
+                8,
+                '${scoreData[i].toInt()}',
+                x - 6,
+                y + 8,
+              );
+
+            // Trip label below
+            canvas
+              ..setColor(PdfColors.grey600)
+              ..drawString(
+                helveticaFont,
+                7,
+                'T${i + 1}',
+                x - 4,
+                topMargin + graphHeight + 8,
+              );
+          }
+        } else if (scoreData.length == 1) {
+          // Single point
+          final double x = leftMargin + graphWidth / 2;
+          final double y = topMargin + graphHeight - (scoreData[0].clamp(0, 100) / 100 * graphHeight);
+
+          canvas
+            ..setColor(PdfColors.blue800)
+            ..drawEllipse(x, y, 5, 5)
+            ..fillPath();
+
+          canvas
+            ..setColor(PdfColors.blue900)
+            ..drawString(
+              helveticaBoldFont,
+              9,
+              '${scoreData[0].toInt()}',
+              x - 8,
+              y + 10,
+            );
+        }
+      },
+    ),
+  );
 }
 
 void _showEmailDialog(BuildContext context) {
@@ -1022,10 +1281,11 @@ void _showEmailDialog(BuildContext context) {
 
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (dialogContext) => AlertDialog(
       title: Text('Email Report'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Enter the email address to send this report to:'),
           SizedBox(height: 16),
@@ -1038,72 +1298,327 @@ void _showEmailDialog(BuildContext context) {
             ),
             keyboardType: TextInputType.emailAddress,
           ),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.attach_file, color: Colors.blue, size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Your report will be attached as a professional PDF',
+                    style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(dialogContext),
           child: Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: () async {
-            Navigator.pop(context);
-            await _sendEmailReport(context, emailController.text);
+            Navigator.pop(dialogContext);
+            await _sendEmailReportWithPdf(context, emailController.text);
           },
-          child: Text('Send'),
+          child: Text('Send with PDF'),
         ),
       ],
     ),
   );
 }
 
-Future<void> _sendEmailReport(BuildContext context, String email) async {
+Future<void> _sendEmailReportWithPdf(BuildContext context, String email) async {
   if (email.isEmpty || !email.contains('@')) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Please enter a valid email address')),
     );
     return;
   }
 
+  // Show loading indicator
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+          SizedBox(width: 16),
+          Text('Generating PDF report...'),
+        ],
+      ),
+      duration: Duration(seconds: 10),
+    ),
+  );
+
   try {
-    // Generate summary text for email
-    String body = '''
-Driving Safety Report
+    final now = DateTime.now();
+    final driverName = userName.isNotEmpty ? userName : 'Driver';
 
-Driver: ${userName.isNotEmpty ? userName : "N/A"}
-Date: ${DateFormat('MMM d, yyyy').format(DateTime.now())}
+    // Generate PDF
+    final pdf = pw.Document();
 
-OVERALL SCORE: $score (${_getScoreLabel(score)})
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: pw.EdgeInsets.all(40),
+        build: (pw.Context pdfContext) {
+          return [
+            // Header
+            pw.Container(
+              padding: pw.EdgeInsets.all(20),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.blue800,
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Text('NOTRACKDRIVE', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                  pw.SizedBox(height: 4),
+                  pw.Text('Driving Safety Report', style: pw.TextStyle(fontSize: 14, color: PdfColors.white)),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 20),
 
-SUMMARY:
-- Total Trips: $totalTrips
-- Total Distance: ${totalDistanceMiles.toStringAsFixed(1)} miles
-- Total Duration: ${_formatDuration(totalDurationMinutes)}
-- Average Score: ${scores.isNotEmpty ? (scores.reduce((a, b) => a + b) / scores.length).toStringAsFixed(0) : "N/A"}
+            // Driver info and date
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Driver: $driverName', style: pw.TextStyle(fontSize: 12)),
+                pw.Text('Generated: ${DateFormat('MMMM d, yyyy h:mm a').format(now)}', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700)),
+              ],
+            ),
+            pw.SizedBox(height: 20),
 
-DRIVING HABITS:
-${breakdown.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
+            // Overall Score Box
+            pw.Container(
+              padding: pw.EdgeInsets.all(20),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.blue, width: 2),
+                borderRadius: pw.BorderRadius.circular(8),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.Column(
+                    children: [
+                      pw.Text('OVERALL SAFETY SCORE', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+                      pw.SizedBox(height: 8),
+                      pw.Text('$score', style: pw.TextStyle(fontSize: 48, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+                      pw.Text('out of 100', style: pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+                      pw.SizedBox(height: 8),
+                      pw.Container(
+                        padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: score >= 80 ? PdfColors.green100 : score >= 60 ? PdfColors.orange100 : PdfColors.red100,
+                          borderRadius: pw.BorderRadius.circular(12),
+                        ),
+                        child: pw.Text(_getScoreLabel(score), style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 24),
 
-This report was generated by DriveGuard.
-''';
+            // Summary Statistics Section
+            pw.Text('Summary Statistics', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Divider(color: PdfColors.blue200),
+            pw.SizedBox(height: 8),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              children: [
+                _buildPdfStatBox('Total Trips', '$totalTrips'),
+                _buildPdfStatBox('Distance', '${totalDistanceMiles.toStringAsFixed(1)} mi'),
+                _buildPdfStatBox('Duration', _formatDuration(totalDurationMinutes)),
+              ],
+            ),
+            pw.SizedBox(height: 24),
 
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: email,
-      query: 'subject=Driving Safety Report - ${DateFormat('MMM d, yyyy').format(DateTime.now())}&body=${Uri.encodeComponent(body)}',
+            // Driving Habits Section
+            pw.Text('Driving Habits Analysis', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+            pw.Divider(color: PdfColors.blue200),
+            pw.SizedBox(height: 8),
+            ...breakdown.entries.map((e) => pw.Container(
+              margin: pw.EdgeInsets.only(bottom: 6),
+              padding: pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(e.key, style: pw.TextStyle(fontSize: 11)),
+                  pw.Text(e.value, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                ],
+              ),
+            )),
+            pw.SizedBox(height: 24),
+
+            // Score Trajectory Graph
+            if (scores.isNotEmpty) ...[
+              pw.Text('Score Trajectory', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Divider(color: PdfColors.blue200),
+              pw.SizedBox(height: 8),
+              _buildPdfScoreChart(scores.take(10).toList().reversed.toList(), pdf),
+              pw.SizedBox(height: 8),
+              pw.Text(_getEmailTrendMessage(), style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic)),
+              pw.SizedBox(height: 24),
+            ],
+
+            // Recent Trips Table
+            if (tripHistory.isNotEmpty) ...[
+              pw.Text('Recent Trips', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+              pw.Divider(color: PdfColors.blue200),
+              pw.SizedBox(height: 8),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: pw.BoxDecoration(color: PdfColors.blue800),
+                cellStyle: pw.TextStyle(fontSize: 10),
+                cellPadding: pw.EdgeInsets.all(6),
+                headers: ['Date', 'Distance', 'Duration', 'Score'],
+                data: tripHistory.take(10).map((trip) {
+                  String dateStr = trip['date'] ?? '';
+                  String formattedDate = 'N/A';
+                  if (dateStr.isNotEmpty) {
+                    try {
+                      DateTime date = DateTime.parse(dateStr).toLocal();
+                      formattedDate = DateFormat('MMM d, yyyy').format(date);
+                    } catch (_) {}
+                  }
+                  return [
+                    formattedDate,
+                    '${trip['distance'].toStringAsFixed(1)} mi',
+                    '${trip['duration'].toStringAsFixed(0)} min',
+                    '${trip['score'].toInt()}',
+                  ];
+                }).toList(),
+              ),
+            ],
+            pw.SizedBox(height: 40),
+
+            // Footer
+            pw.Container(
+              padding: pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.grey100,
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                children: [
+                  pw.Text('This report was generated by NoTrackDrive', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                  pw.Text('For questions, contact support@notrackdrive.com', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+                ],
+              ),
+            ),
+          ];
+        },
+      ),
     );
 
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
+    final pdfBytes = await pdf.save();
+    // Filename format: NoTrackDrive_DriverName_Date_Time.pdf
+    final safeDriverName = driverName.replaceAll(RegExp(r'[^\w\s]'), '').replaceAll(' ', '_');
+    final fileName = 'NoTrackDrive_${safeDriverName}_${DateFormat('yyyy-MM-dd_HHmm').format(now)}.pdf';
+
+    // Clear the loading snackbar
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    // Send email with PDF - clean, non-repetitive body
+    final emailBody = '''Please find my NoTrackDrive Driving Safety Report attached.
+
+Summary:
+- Overall Score: $score/100 (${_getScoreLabel(score)})
+- Total Trips: $totalTrips
+- Total Distance: ${totalDistanceMiles.toStringAsFixed(1)} miles
+
+Best regards,
+$driverName''';
+
+    final success = await sendEmailWithPdf(
+      recipientEmail: email,
+      subject: 'NoTrackDrive Report - $driverName - ${DateFormat('MMM d, yyyy').format(now)}',
+      bodyText: emailBody,
+      pdfBytes: pdfBytes,
+      pdfFileName: fileName,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(kIsWeb
+              ? 'PDF downloaded! Attach it to your email.'
+              : 'Email prepared with PDF attachment!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open email app')),
+        SnackBar(content: Text('Failed to send email'), backgroundColor: Colors.red),
       );
     }
   } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error sending email: $e')),
+      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
     );
+  }
+}
+
+// Helper for PDF stat boxes
+pw.Widget _buildPdfStatBox(String label, String value) {
+  return pw.Container(
+    padding: pw.EdgeInsets.all(12),
+    decoration: pw.BoxDecoration(
+      color: PdfColors.blue50,
+      borderRadius: pw.BorderRadius.circular(8),
+    ),
+    child: pw.Column(
+      children: [
+        pw.Text(value, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
+        pw.SizedBox(height: 4),
+        pw.Text(label, style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+      ],
+    ),
+  );
+}
+
+// Helper to get trend message for email
+String _getEmailTrendMessage() {
+  if (scores.length < 2) return '';
+
+  List<double> recent = scores.take(5).toList();
+  List<double> older = scores.skip(5).take(5).toList();
+
+  if (older.isEmpty) return '';
+
+  double recentAvg = recent.reduce((a, b) => a + b) / recent.length;
+  double olderAvg = older.reduce((a, b) => a + b) / older.length;
+  double diff = recentAvg - olderAvg;
+
+  if (diff > 5) {
+    return 'Trend: IMPROVING - Your driving is getting better!';
+  } else if (diff < -5) {
+    return 'Trend: DECLINING - Focus on smoother driving.';
+  } else {
+    return 'Trend: STABLE - Consistent driving performance.';
   }
 }
 
@@ -1232,15 +1747,25 @@ class TripData {
   TripData({required this.date, required this.score});
 }
 
-// Custom painter for score trajectory visualization
+// Custom painter for score trajectory visualization with axis labels
 class ScoreTrajectoryPainter extends CustomPainter {
   final List<double> scoreData;
-  ScoreTrajectoryPainter(this.scoreData);
+  final List<String> dateLabels;
+
+  ScoreTrajectoryPainter(this.scoreData, {this.dateLabels = const []});
 
   @override
   void paint(Canvas canvas, Size size) {
     if (scoreData.isEmpty) return;
 
+    // Define margins for axis labels (increased left margin for better spacing)
+    const double leftMargin = 40;
+    const double bottomMargin = 25;
+    const double chartPadding = 15; // Extra padding from Y-axis for first point
+    final double chartWidth = size.width - leftMargin - chartPadding;
+    final double chartHeight = size.height - bottomMargin;
+
+    // Paint styles
     final linePaint = Paint()
       ..color = Colors.blue
       ..strokeWidth = 3
@@ -1251,15 +1776,45 @@ class ScoreTrajectoryPainter extends CustomPainter {
       ..color = Colors.blue
       ..style = PaintingStyle.fill;
 
+    final gridPaint = Paint()
+      ..color = Colors.grey.withValues(alpha: 0.3)
+      ..strokeWidth = 1;
+
+    final textStyle = TextStyle(
+      color: Colors.grey[600],
+      fontSize: 10,
+    );
+
+    // Draw Y-axis labels (0, 50, 100)
+    final yLabels = [0, 50, 100];
+    for (var label in yLabels) {
+      final y = chartHeight - (label / 100) * chartHeight;
+
+      // Draw grid line
+      canvas.drawLine(
+        Offset(leftMargin, y),
+        Offset(size.width, y),
+        gridPaint,
+      );
+
+      // Draw label
+      final textSpan = TextSpan(text: '$label', style: textStyle);
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: ui.TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(leftMargin - textPainter.width - 4, y - textPainter.height / 2));
+    }
+
+    // Draw score line
     final path = Path();
-    final double xStep = size.width / (scoreData.length - 1).clamp(1, scoreData.length);
-    final double minScore = scoreData.reduce((a, b) => a < b ? a : b);
-    final double maxScore = scoreData.reduce((a, b) => a > b ? a : b);
-    final double range = (maxScore - minScore).clamp(1, 100);
+    final double xStep = chartWidth / (scoreData.length - 1).clamp(1, scoreData.length);
 
     for (int i = 0; i < scoreData.length; i++) {
-      final x = i * xStep;
-      final y = size.height - ((scoreData[i] - minScore) / range) * size.height * 0.8 - size.height * 0.1;
+      final x = leftMargin + chartPadding + i * xStep;
+      // Use fixed scale 0-100 for consistency
+      final y = chartHeight - (scoreData[i].clamp(0, 100) / 100) * chartHeight;
 
       if (i == 0) {
         path.moveTo(x, y);
@@ -1268,9 +1823,35 @@ class ScoreTrajectoryPainter extends CustomPainter {
       }
 
       canvas.drawCircle(Offset(x, y), 4, dotPaint);
+
+      // Draw score value above each point
+      final scoreSpan = TextSpan(
+        text: '${scoreData[i].toInt()}',
+        style: TextStyle(color: Colors.blue[700], fontSize: 9, fontWeight: FontWeight.bold),
+      );
+      final scorePainter = TextPainter(
+        text: scoreSpan,
+        textDirection: ui.TextDirection.ltr,
+      );
+      scorePainter.layout();
+      scorePainter.paint(canvas, Offset(x - scorePainter.width / 2, y - 16));
     }
 
     canvas.drawPath(path, linePaint);
+
+    // Draw X-axis labels (Trip numbers)
+    if (scoreData.length <= 10) {
+      for (int i = 0; i < scoreData.length; i++) {
+        final x = leftMargin + chartPadding + i * xStep;
+        final labelSpan = TextSpan(text: 'T${i + 1}', style: textStyle);
+        final labelPainter = TextPainter(
+          text: labelSpan,
+          textDirection: ui.TextDirection.ltr,
+        );
+        labelPainter.layout();
+        labelPainter.paint(canvas, Offset(x - labelPainter.width / 2, chartHeight + 6));
+      }
+    }
   }
 
   @override
